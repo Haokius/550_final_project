@@ -1,7 +1,59 @@
+from bs4 import BeautifulSoup
 import requests
-import bs4 as beautifulsoup
+import json
 
-# NOTE: Not too sure how to access search bar for google finance yet
+# Function to extract price from HTML
+def get_price(soup_element):
+    price = soup_element.find('main').find('div', 'AHmHk').get_text()
+    return price
+
+# Function to extract price change percentage from HTML
+def get_change_percentage(soup_element):
+    change_percentage_element = soup_element.find('main').find('div', 'JwB6zf')
+    if change_percentage_element:
+        return change_percentage_element.get_text()
+    else:
+        return None
+
+# Function to extract stock title from HTML
+def get_stock_title(soup_element):
+    title = soup_element.find('main').find('div', 'zzDege').get_text()
+    return title
+
+# Function to extract stock description from HTML
+def get_stock_description(soup_element):
+    # Extracting detailed stock description
+    description_elements = soup_element.find_all("div", {"class": "gyFHrc"})
+    stock_description = {}
+
+    for element in description_elements:
+        description = element.find("div", {"class": "mfs7Fc"}).get_text()
+        value = element.find("div", {"class": "P6K39c"}).get_text()
+        stock_description[description] = value
+
+    return stock_description
+
+# Function to get HTML content from Google Finance URL
+def get_finance_html(ticker):
+    url = f"https://www.google.com/finance/quote/{ticker}"
+    response = requests.get(url)
+    return response.text
+
+# Function to extract finance information from HTML
+def extract_finance_information_from_html(html, ticker):
+    soup = BeautifulSoup(html, 'html.parser')
+    price = get_price(soup)
+    change_percentage = get_change_percentage(soup)
+    title = get_stock_title(soup)
+    description = get_stock_description(soup)
+    finance_data = {
+        'ticker': ticker,
+        'title': title,
+        'price': price,
+        'change_percentage': change_percentage,
+        'description': description
+    }
+    return finance_data
 
 fortune_500_tickers = [
     "AAPL:NASDAQ",   # Apple Inc.
@@ -57,3 +109,16 @@ fortune_500_tickers = [
     "LOW:NYSE",      # Lowe's Companies, Inc.
     "CAT:NYSE",      # Caterpillar Inc.
 ]
+
+# Main function to extract data from multiple Google Finance URLs
+def main():
+    finance_results = []
+    for ticker in fortune_500_tickers:
+        html_content = get_finance_html(ticker)
+        finance_data = extract_finance_information_from_html(html_content, ticker)
+        finance_results.append(finance_data)
+    with open('finance_data.json', 'w') as f:
+        json.dump(finance_results, f, indent=4)
+
+if __name__ == "__main__":
+    main()
