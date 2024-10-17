@@ -19,5 +19,3 @@ uvicorn main:app --reload
 ```
 
 the backend server should be running, to test endpoints, put /docs at the end of the url to see the swagger documentation
-
-```
