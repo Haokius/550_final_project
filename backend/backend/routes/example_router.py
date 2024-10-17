@@ -1,4 +1,5 @@
 from fastapi import HTTPException, APIRouter
+import random
 
 example_router = APIRouter(
     prefix="/example",
@@ -9,8 +10,7 @@ example_router = APIRouter(
 async def read_root():
     return {"message": "Hello World"}
 
-@example_router.get("/{item_id}")
-def read_item(item_id: int, q: str = None):
-    if item_id == 0:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return {"item_id": item_id, "q": q}
+@example_router.get("/random")
+async def get_random_number():
+    num = random.randint(1, 100)
+    return {"number": num}
