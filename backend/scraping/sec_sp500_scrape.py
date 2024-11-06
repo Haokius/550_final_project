@@ -48,8 +48,9 @@ def process_feature(feature_data):
 email = "haokunkevinhe@gmail.com" # NOTE: SET YOUR OWN EMAIL HERE
 
 output_data = []
+incomplete_companies = []
 edgar = EdgarClient(user_agent=f"DummyCompany {email}")
-for ticker, name, cik in company_ciks[:1]:
+for ticker, name, cik in company_ciks[:10]:
     company_data = {}
     response = edgar.get_company_facts(cik=cik)
     cik = response["cik"]
@@ -80,9 +81,13 @@ for ticker, name, cik in company_ciks[:1]:
             company_data[name], rows = process_feature(feature_data)
             total_rows += rows
         else:
-            raise Exception(f"Feature {name} not found for {ticker}")
+            incomplete_companies.append({"ticker": ticker, "feature": feature, "cik": cik})
+            # raise Exception(f"Feature {name} not found for {ticker} with CIK {cik}")
     company_data["total_rows"] = total_rows
     output_data.append(company_data)
+
+with open("incomplete_companies.json", "w") as f:
+    json.dump(incomplete_companies, f, indent=4)
 
 with open("sp500_data.json", "w") as f:
     json.dump(output_data, f, indent=4)
