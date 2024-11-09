@@ -51,11 +51,14 @@ def get_company_frames(feature: str):
             response = edgar.get_frames(year=year, quarter=quarter, taxonomy="us-gaap", tag=feature, unit="USD")
             processed_response = process(response)
             output_data.append(processed_response)
+    print("Should be 44:", len(output_data))
     
     with open(f"frames_data_{feature}.json", "w") as f:
         json.dump(output_data, f, indent=4)
 
+# TODO: need to find the correct names of features, not all of them are retrievable right now
 features = [
+    "AccountsPayableCurrent",
     "RevenueFromContractWithCustomerExcludingAssessedTax",
     "NetIncomeLoss",
     "Assets",
@@ -68,13 +71,16 @@ features = [
     "ComprehensiveIncomeNetOfTax"
     ]
 
-def main():
-    for feature in features:
+def process_all_features():
+    for feature in features[:1]:
         get_company_frames(feature)
 
-if __name__ == "__main__":
-    main()
+def merge_all_processed_jsons():
+    ...
 
+if __name__ == "__main__":
+    # first process_all_features()
+    # then taking all 15-20 json files, merge into one suitable file for uploading to the database
 
 # Top 10 important features:
 # 1. RevenueFromContractWithCustomerExcludingAssessedTax - Represents the company's revenue.
