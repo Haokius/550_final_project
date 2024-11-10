@@ -5,6 +5,7 @@ import json
 from collections import defaultdict
 import time
 from tqdm import tqdm
+import csv
 
 email = "haokunkevinhe@gmail.com" # NOTE: SET YOUR OWN EMAIL HERE
 
@@ -26,9 +27,6 @@ def get_sp500_ciks():
     
     return company_ciks, cik_to_company
 
-company_ciks, cik_to_company = get_sp500_ciks()
-company_ciks = set(company_ciks)
-
 def process(response):
     processed_chunk = {"ccp": response["ccp"], "feature": response["tag"], "data": []}
     data = response["data"]
@@ -43,54 +41,66 @@ def process(response):
     processed_chunk["data"].sort(key=lambda x: x[0])
     return processed_chunk
 
-def get_company_frames(feature: str):
+def get_company_frames(feature: str, all_features: dict):
     output_data = []
     edgar = EdgarClient(user_agent=f"DummyCompany {email}")
-    for year in tqdm(range(2010, 2021)):
+    for year in tqdm(range(2010, 2023)): # NOTE: change here to modify date
         for quarter in tqdm(range(1, 5)):
             response = edgar.get_frames(year=year, quarter=quarter, taxonomy="us-gaap", tag=feature, unit="USD")
             processed_response = process(response)
             output_data.append(processed_response)
-    print("Should be 44:", len(output_data))
-    
-    with open(f"frames_data_{feature}.json", "w") as f:
-        json.dump(output_data, f, indent=4)
+    all_features[feature] = output_data
 
-# TODO: need to find the correct names of features, not all of them are retrievable right now
-features = [
-    "AccountsPayableCurrent",
-    "RevenueFromContractWithCustomerExcludingAssessedTax",
-    "NetIncomeLoss",
-    "Assets",
-    "Liabilities",
-    "OperatingIncomeLoss",
-    "CashAndCashEquivalentsAtCarryingValue",
-    "AccountsReceivableNetCurrent",
-    "InventoryNet",
-    "LongTermDebt",
-    "ComprehensiveIncomeNetOfTax"
+features = [ # NOTE: choose appropriate features
+    "AccountsPayableCurrent", # works
+    # "Revenues", # too small
+    # "NetIncomeLoss", # too small
+    "Assets", # works
+    "Liabilities", # works
+    # "OperatingIncomeLoss", # too small
+    "CashAndCashEquivalentsAtCarryingValue", # works
+    "AccountsReceivableNetCurrent", # works
+    "InventoryNet", # works
+    "LongTermDebt", # works
+    # "ComprehensiveIncomeNetOfTax" # too small
     ]
 
 def process_all_features():
-    for feature in features[:1]:
-        get_company_frames(feature)
+    all_features = dict()
+    for feature in features:
+        get_company_frames(feature, all_features)
+    return all_features
 
-def merge_all_processed_jsons():
-    ...
+# all_features looks like:
+# (feature) -> List[Dict{ccp, feature (all the same), data: List[(cik, val)]}]
+# Want to merge into:
+# (cik, ccp) -> (all features)
+def merge_all_processed_jsons(all_features):
+    output = defaultdict(list)
+    for feature in features:
+        for chunk in all_features[feature]:
+            ccp = chunk["ccp"]
+            data = chunk["data"]
+            for cik, val in data:
+                if val is not None:
+                    output[(cik, ccp)].append(val)
+                else:
+                    output[(cik, ccp)].append("null")
+    return output
 
-if __name__ == "__main__":
-    # first process_all_features()
-    # then taking all 15-20 json files, merge into one suitable file for uploading to the database
+def write_final_format(merged_features):
+    headers = ["CIK", "CCP"] + features
+    output_list = [headers]
+    for key, val in merged_features.items():
+        output_list.append(list(key) + list(val))
+    
+    with open("sec_sp500_data.csv", mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(output_list)
 
-# Top 10 important features:
-# 1. RevenueFromContractWithCustomerExcludingAssessedTax - Represents the company's revenue.
-# 2. NetIncomeLoss - Shows the net profitability of the company.
-# 3. Assets - Indicates the total value of assets owned by the company.
-# 4. Liabilities - Reflects the company's financial obligations.
-# 5. OperatingIncomeLoss - Key indicator of operational efficiency.
-# 6. CashAndCashEquivalentsAtCarryingValue - Shows liquidity and cash reserves.
-# 7. AccountsReceivableNetCurrent - Demonstrates the company's expected cash inflows.
-# 8. InventoryNet - Important for understanding product stock and sales dynamics.
-# 9. LongTermDebt - Represents the company's long-term financial obligations.
-# 10. ComprehensiveIncomeNetOfTax - Captures total earnings, including other comprehensive income.
+company_ciks, cik_to_company = get_sp500_ciks()
+company_ciks = set(company_ciks)
+all_features = process_all_features()
+merged_features = merge_all_processed_jsons(all_features)
+write_final_format(merged_features)
 
