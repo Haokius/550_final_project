@@ -44,7 +44,7 @@ def process(response):
 def get_company_frames(feature: str, all_features: dict):
     output_data = []
     edgar = EdgarClient(user_agent=f"DummyCompany {email}")
-    for year in tqdm(range(2010, 2023)): # NOTE: change here to modify date
+    for year in tqdm(range(2009, 2023)): # NOTE: change here to modify date
         for quarter in tqdm(range(1, 5)):
             response = edgar.get_frames(year=year, quarter=quarter, taxonomy="us-gaap", tag=feature, unit="USD")
             processed_response = process(response)
@@ -91,8 +91,19 @@ def merge_all_processed_jsons(all_features):
 def write_final_format(merged_features):
     headers = ["CIK", "CCP"] + features
     output_list = [headers]
+    
+    # Helper function to convert CCP (e.g., 'CY2009Q1I') to month indicators
+    def quarter_to_months(ccp):
+        year = ccp[2:6]
+        quarter = int(ccp[7])
+        base_month = (quarter - 1) * 3 + 1
+        return [f"CY{year}M{str(base_month + i).zfill(2)}I" for i in range(3)]
+    
     for key, val in merged_features.items():
-        output_list.append(list(key) + list(val))
+        cik, ccp = key
+        # Create three monthly entries for each quarterly entry
+        for month_ccp in quarter_to_months(ccp):
+            output_list.append([cik, month_ccp] + list(val))
     
     with open("sec_sp500_data.csv", mode="w", newline="") as file:
         writer = csv.writer(file)

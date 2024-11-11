@@ -65,3 +65,7 @@ coverage.xml
 *.iml
 *.iws
 *.ipr
+
+# Data files
+sec_sp500_data.csv
+yahoo_sp500_stock_data_10_years_monthly.csv

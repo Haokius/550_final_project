@@ -20,7 +20,7 @@ def get_sp500_tickers():
 
 def fetch_data(tickers):
     all_data = []
-    start_date = "2013-01-01"
+    start_date = "2009-01-01"
     end_date = datetime.now().strftime("%Y-%m-%d")
 
     for ticker in tickers:
@@ -37,7 +37,7 @@ def fetch_data(tickers):
             print(f"Failed to retrieve data for {ticker}: {e}")
 
     combined_data = pd.concat(all_data)
-    combined_data.to_csv("sp500_stock_data_10_years_monthly.csv", index=False)
+    combined_data.to_csv("yahoo_sp500_stock_data_10_years_monthly.csv", index=False)
 
 sp500_tickers = get_sp500_tickers()
 fetch_data(sp500_tickers)
