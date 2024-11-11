@@ -85,7 +85,7 @@ def merge_all_processed_jsons(all_features):
                 if val is not None:
                     output[(cik, ccp)].append(val)
                 else:
-                    output[(cik, ccp)].append("null")
+                    output[(cik, ccp)].append("")
     return output
 
 def write_final_format(merged_features):
