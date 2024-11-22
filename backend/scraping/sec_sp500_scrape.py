@@ -89,21 +89,19 @@ def merge_all_processed_jsons(all_features):
     return output
 
 def write_final_format(merged_features):
-    headers = ["CIK", "CCP"] + features
+    headers = ["CIK", "Year", "Month"] + features
     output_list = [headers]
     
-    # Helper function to convert CCP (e.g., 'CY2009Q1I') to month indicators
-    def quarter_to_months(ccp):
-        year = ccp[2:6]
-        quarter = int(ccp[7])
-        base_month = (quarter - 1) * 3 + 1
-        return [f"CY{year}M{str(base_month + i).zfill(2)}I" for i in range(3)]
-    
-    for key, val in merged_features.items():
+    for key, val in tqdm(list(merged_features.items()), desc="Writing final format"):
         cik, ccp = key
-        # Create three monthly entries for each quarterly entry
-        for month_ccp in quarter_to_months(ccp):
-            output_list.append([cik, month_ccp] + list(val))
+        # Extract year and month from CCP (e.g., 'CY2009Q1I')
+        year = int(ccp[2:6])
+        quarter = int(ccp[7])
+        # Create three monthly entries for each quarter
+        base_month = (quarter - 1) * 3 + 1
+        for month_offset in range(3):
+            month = base_month + month_offset
+            output_list.append([cik, year, month] + list(val))
     
     with open("sec_sp500_data.csv", mode="w", newline="") as file:
         writer = csv.writer(file)
