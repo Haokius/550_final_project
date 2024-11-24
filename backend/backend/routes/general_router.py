@@ -14,7 +14,7 @@ async def get_stock_data():
 
 # Kevin's Endpoints
 @general_router.get("/stocks/highest-fluctuations")
-async def get_highest_fluctations(engine: Engine):
+async def get_highest_fluctations():
 
     statement = text("""
         WITH MonthlyVolatility AS (
@@ -48,7 +48,7 @@ async def get_highest_fluctations(engine: Engine):
         raise HTTPException(500, detail=f"Error querying database: {str(e)}")
     
 @general_router.get("/stocks/highest-liquidity-debt-ratio")
-async def get_highest_liquidity_debt_ratio(engine: Engine):
+async def get_highest_liquidity_debt_ratio():
     
     statement = text("""
         WITH ProcessedFinancials AS (
@@ -84,7 +84,7 @@ async def get_highest_liquidity_debt_ratio(engine: Engine):
         raise HTTPException(500, detail=f"Error querying database: {str(e)}")
     
 @general_router.get("/stock/greatest-leverage-differences")
-async def get_greatest_leverage_differences(engine: Engine):
+async def get_greatest_leverage_differences():
 
     statement = text("""
         WITH DebtToAssetRatios AS (
