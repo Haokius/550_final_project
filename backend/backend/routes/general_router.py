@@ -1,6 +1,8 @@
+import os
 from fastapi import HTTPException, APIRouter
 from sqlmodel import SQLModel, Field, Session, create_engine, text
 from typing import List, Dict
+from dotenv import load_dotenv
 
 class Company(SQLModel, table=True):
     ticker: str = Field(primary_key=True)
@@ -32,9 +34,9 @@ class StockPrice(SQLModel, table=True):
     month: int
     day: int
 
+load_dotenv()
 
-# Database setup (Replace `sqlite:///example.db` with your actual database URL)
-DATABASE_URL = "postgresql://jit_team:20241126chris@database-final-project.cftba7ofekj0.us-east-1.rds.amazonaws.com:5432/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
 engine = create_engine(DATABASE_URL)
 
 
@@ -364,3 +366,235 @@ async def get_greatest_leverage_differences():
             raise HTTPException(404, detail="No stock data found with the specified criteria")
     except Exception as e:
         raise HTTPException(500, detail=f"Error querying database: {str(e)}")
+    
+
+@general_router.get("/companies/similar_debt_ratios", response_model=List[Dict])
+async def get_similar_debt_ratios_faster():
+    """
+    Optimized query to identify pairs of companies with similar debt-to-asset ratios,
+    ensuring it runs faster by limiting pairwise comparisons using bucketing and stricter filters.
+    """
+    query = """
+    WITH FilteredFinancials AS (
+       SELECT F.CIK AS cik,
+              C.CompanyName AS company_name,
+              (F.long_term_debt / NULLIF(F.assets, 0)) AS debt_to_asset_ratio,
+              NTILE(10) OVER (ORDER BY (F.long_term_debt / NULLIF(F.assets, 0))) AS bucket
+       FROM Financials F
+       JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+       WHERE F.assets > 0 
+         AND F.long_term_debt IS NOT NULL
+         AND MOD(CAST(F.CIK AS INTEGER), 3) = 0
+    ),
+    PairwiseComparison AS (
+       SELECT FF1.cik AS company1_cik, 
+              FF1.company_name AS company1_name,
+              FF2.cik AS company2_cik, 
+              FF2.company_name AS company2_name,
+              ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) AS ratio_difference,
+              (FF1.debt_to_asset_ratio + FF2.debt_to_asset_ratio) / 2 AS avg_debt_to_asset_ratio
+       FROM FilteredFinancials FF1
+       JOIN FilteredFinancials FF2 
+         ON FF1.bucket = FF2.bucket AND FF1.cik < FF2.cik
+       WHERE ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) < 0.05
+    ),
+    RankedPairs AS (
+       SELECT company1_cik, company1_name, 
+              company2_cik, company2_name, 
+              ratio_difference,
+              ROW_NUMBER() OVER (PARTITION BY company1_cik ORDER BY ratio_difference ASC) AS pair_rank
+       FROM PairwiseComparison
+    )
+    SELECT company1_cik, company1_name, 
+           company2_cik, company2_name, 
+           ratio_difference
+    FROM RankedPairs
+    WHERE pair_rank <= 10
+    ORDER BY ratio_difference ASC
+    LIMIT 300;
+    """
+    try:
+        with Session(engine) as session:
+            results = session.exec(text(query)).all()
+            if not results:
+                raise HTTPException(status_code=404, detail="No data found")
+            return [
+                {
+                    "Company1CIK": row.company1_cik,
+                    "Company1Name": row.company1_name,
+                    "Company2CIK": row.company2_cik,
+                    "Company2Name": row.company2_name,
+                    "RatioDifference": row.ratio_difference,
+                }
+                for row in results
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
+
+
+@general_router.get("/companies/similar_inventory_ratios", response_model=List[Dict])
+async def get_similar_inventory_ratios_balanced():
+    """
+    Query to identify pairs of companies with similar inventory-to-asset ratios
+    for balanced execution time
+    """
+    query = """
+    WITH InitialDebtRatios AS (
+       SELECT F.CIK,
+              C.CompanyName,
+              F.inventory_net,
+              F.assets,
+              F.cash_and_equivalents,
+              F.liabilities,
+              (F.inventory_net / NULLIF(F.assets, 0)) AS InventoryToAssetRatio,
+              (F.cash_and_equivalents / NULLIF(F.liabilities, 0)) AS CashToLiabilityRatio
+       FROM Financials F
+       JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+       WHERE F.inventory_net IS NOT NULL
+         AND F.assets IS NOT NULL
+         AND F.assets > 0
+         AND F.liabilities IS NOT NULL
+    ),
+    FilteredDebtRatios AS (
+       SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities
+       FROM InitialDebtRatios
+       WHERE CashToLiabilityRatio > 0.2  -- Include more companies by reducing threshold
+    ),
+    BucketedDebtRatios AS (
+       SELECT *, NTILE(5) OVER (ORDER BY InventoryToAssetRatio) AS bucket
+       FROM FilteredDebtRatios
+    ),
+    CrossComparison AS (
+       SELECT R1.CIK AS "Company1", R1.CompanyName AS "Company1Name",
+              R2.CIK AS "Company2", R2.CompanyName AS "Company2Name",
+              ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) AS "RatioDifference",
+              (R1.CashToLiabilityRatio + R2.CashToLiabilityRatio) / 2 AS "AvgCashToLiabilityRatio",
+              (R1.assets + R2.assets) / 2 AS "AvgAssets",
+              (R1.liabilities + R2.liabilities) / 2 AS "AvgLiabilities"
+       FROM BucketedDebtRatios R1
+       JOIN BucketedDebtRatios R2 
+         ON R1.bucket = R2.bucket AND R1.CIK < R2.CIK
+       WHERE ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) < 0.1
+    ),
+    RankedComparison AS (
+       SELECT "Company1", "Company1Name", "Company2", "Company2Name", "RatioDifference", 
+              "AvgCashToLiabilityRatio", "AvgAssets", "AvgLiabilities",
+              ROW_NUMBER() OVER (PARTITION BY "Company1" ORDER BY "RatioDifference" ASC) AS "PairRank"
+       FROM CrossComparison
+    )
+    SELECT "Company1", "Company1Name", "Company2", "Company2Name", "RatioDifference", 
+           "AvgCashToLiabilityRatio", "AvgAssets", "AvgLiabilities"
+    FROM RankedComparison
+    WHERE "PairRank" <= 20
+    ORDER BY "RatioDifference" ASC
+    LIMIT 1000;
+    """
+    try:
+        with Session(engine) as session:
+            results = session.exec(text(query)).all()
+            if not results:
+                raise HTTPException(status_code=404, detail="No data found")
+            return [
+                {
+                    "Company1CIK": row.Company1,
+                    "Company1Name": row.Company1Name,
+                    "Company2CIK": row.Company2,
+                    "Company2Name": row.Company2Name,
+                    "RatioDifference": row.RatioDifference,
+                    "AvgCashToLiabilityRatio": row.AvgCashToLiabilityRatio,
+                    "AvgAssets": row.AvgAssets,
+                    "AvgLiabilities": row.AvgLiabilities,
+                }
+                for row in results
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
+
+@general_router.get("/companies/strong_liquidity", response_model=List[Dict])
+async def get_companies_with_strong_liquidity():
+    """
+    Identifies companies with cash reserves more than twice their liabilities,
+    highlighting financially stable firms with strong liquidity.
+    """
+    query = """
+    SELECT F.CIK AS "cik", 
+           C.CompanyName AS "company_name", 
+           F.cash_and_equivalents AS "cash_and_equivalents", 
+           F.liabilities AS "liabilities",
+           (F.cash_and_equivalents / NULLIF(F.liabilities, 0)) AS "cash_to_liability_ratio"
+    FROM Financials F
+    JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+    WHERE F.liabilities IS NOT NULL
+      AND F.liabilities > 0
+      AND F.cash_and_equivalents > (2 * F.liabilities)
+    ORDER BY "cash_to_liability_ratio" DESC;
+    """
+    try:
+        with Session(engine) as session:
+            results = session.exec(text(query)).all()
+            if not results:
+                raise HTTPException(status_code=404, detail="No data found")
+            return [
+                {
+                    "CIK": row.cik,
+                    "CompanyName": row.company_name,
+                    "CashAndEquivalents": row.cash_and_equivalents,
+                    "Liabilities": row.liabilities,
+                    "CashToLiabilityRatio": row.cash_to_liability_ratio,
+                }
+                for row in results
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
+
+
+@general_router.get("/companies/financial_improvement", response_model=List[Dict])
+async def get_companies_with_financial_improvement():
+    """
+    Identifies companies with significant financial improvement over two years,
+    specifically those that have increased cash reserves by more than 5% and reduced long-term debt by more than 5%.
+    """
+    query = """
+    WITH YearlyFinancialData AS (
+       SELECT F.CIK AS cik,
+              C.CompanyName AS company_name,
+              F.year AS year,
+              F.cash_and_equivalents AS cash_and_equivalents,
+              F.long_term_debt AS long_term_debt,
+              LAG(F.cash_and_equivalents) OVER (PARTITION BY F.CIK ORDER BY F.year) AS prev_cash,
+              LAG(F.long_term_debt) OVER (PARTITION BY F.CIK ORDER BY F.year) AS prev_debt,
+              (F.cash_and_equivalents - LAG(F.cash_and_equivalents) OVER (PARTITION BY F.CIK ORDER BY F.year)) * 100.0 / NULLIF(LAG(F.cash_and_equivalents) OVER (PARTITION BY F.CIK ORDER BY F.year), 0) AS cash_growth_percentage,
+              (LAG(F.long_term_debt) OVER (PARTITION BY F.CIK ORDER BY F.year) - F.long_term_debt) * 100.0 / NULLIF(LAG(F.long_term_debt) OVER (PARTITION BY F.CIK ORDER BY F.year), 0) AS debt_reduction_percentage,
+              AVG(F.cash_and_equivalents) OVER (PARTITION BY F.CIK ORDER BY F.year ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS three_year_avg_cash
+       FROM Financials F
+       JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+    )
+    SELECT cik, company_name, year, cash_and_equivalents, long_term_debt,
+           cash_growth_percentage, debt_reduction_percentage, three_year_avg_cash
+    FROM YearlyFinancialData
+    WHERE cash_and_equivalents > prev_cash
+      AND long_term_debt < prev_debt
+      AND cash_growth_percentage > 5
+      AND debt_reduction_percentage > 5
+    ORDER BY year, cik;
+    """
+    try:
+        with Session(engine) as session:
+            results = session.exec(text(query)).all()
+            if not results:
+                raise HTTPException(status_code=404, detail="No data found")
+            return [
+                {
+                    "CIK": row.cik,
+                    "CompanyName": row.company_name,
+                    "Year": row.year,
+                    "CashAndEquivalents": row.cash_and_equivalents,
+                    "LongTermDebt": row.long_term_debt,
+                    "CashGrowthPercentage": row.cash_growth_percentage,
+                    "DebtReductionPercentage": row.debt_reduction_percentage,
+                    "ThreeYearAvgCash": row.three_year_avg_cash,
+                }
+                for row in results
+            ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {e}")
