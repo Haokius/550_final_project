@@ -277,11 +277,20 @@ async def get_highest_fluctations():
     """)
 
     try:
-        with engine.connect() as con:
-            response = con.execute(statement)
-            results = response.fetchall()
+        with Session(engine) as session:
+            results = session.exec(statement).all()
         if results:
-            return [dict(row) for row in results]
+            return [
+                {
+                    "Ticker": row.ticker,
+                    "CompanyName": row.companyname,
+                    "CIK": row.cik,
+                    "Year": row.year,
+                    "Month": row.month,
+                    "AverageMonthlyVolatility": row.avgmonthlyvolatility
+                }
+                for row in results
+            ]
         else:
             raise HTTPException(404, detail="No stock data found with the specified criteria")
     except Exception as e:
@@ -313,11 +322,21 @@ async def get_highest_liquidity_debt_ratio():
     """)
 
     try:
-        with engine.connect() as con:
-            response = con.execute(statement)
-            results = response.fetchall()
+        with Session(engine) as session:
+            results = session.exec(statement).all()
         if results:
-            return [dict(row) for row in results]
+            return [
+                {
+                    "CompanyName": row.companyname,
+                    "CIK": row.cik,
+                    "CashAndEquivalents": row.cash_and_equivalents,
+                    "LongTermDebt": row.long_term_debt,
+                    "Year": row.year,
+                    "Quarter": row.quarter,
+                    "CashToDebtRatio": row.cashtodebtratio
+                }
+                for row in results
+            ]
         else:
             raise HTTPException(404, detail="No stock data found with the specified criteria")
     except Exception as e:
@@ -357,11 +376,21 @@ async def get_greatest_leverage_differences():
     """)
 
     try:
-        with engine.connect() as con:
-            response = con.execute(statement)
-            results = response.fetchall()
+        with Session(engine) as session:
+            results = session.exec(statement).all()
         if results:
-            return [dict(row) for row in results]
+            return [
+                {
+                    "Company1CIK": row.company1,
+                    "Company1Name": row.company1name,
+                    "Company2CIK": row.company2,
+                    "Company2Name": row.company2name,
+                    "Company1Ratio": row.company1ratio,
+                    "Company2Ratio": row.company2ratio,
+                    "RatioDifference": row.ratiodifference
+                }
+                for row in results
+            ]
         else:
             raise HTTPException(404, detail="No stock data found with the specified criteria")
     except Exception as e:
