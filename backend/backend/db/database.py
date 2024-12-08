@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
-from .config import settings
+from ..config.config import settings
 
 # Creates connection pool to your AWS RDS database
 engine = create_async_engine(
