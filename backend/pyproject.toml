@@ -25,6 +25,8 @@ greenlet = "^3.1.1"
 email-validator = "^2.2.0"
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 pyjwt = "^2.10.0"
+psycopg2-binary = "^2.9.10"
+psycopg2 = "^2.9.10"
 
 
 [build-system]
