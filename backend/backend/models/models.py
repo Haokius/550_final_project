@@ -37,3 +37,24 @@ class Financial(Base):
     accounts_receivable_current = Column(Numeric, nullable=True)
     inventory_net = Column(Numeric, nullable=True)
     long_term_debt = Column(Numeric, nullable=True)
+
+class Company(Base):
+    __tablename__ = "companies"
+    
+    ticker = Column(String, primary_key=True)
+    companyname = Column(String)
+    cik = Column(String)
+
+class StockPrice(Base):
+    __tablename__ = "stock_prices"
+    
+    id = Column(Integer, primary_key=True)
+    open = Column(Numeric)
+    high = Column(Numeric)
+    low = Column(Numeric)
+    close = Column(Numeric)
+    volume = Column(Integer)
+    ticker = Column(String)
+    year = Column(Integer)
+    month = Column(Integer)
+    day = Column(Integer)
