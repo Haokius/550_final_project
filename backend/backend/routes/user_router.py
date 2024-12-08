@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, delete, and_
-from backend.database import get_db
-from backend.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData
-from backend.models import User, UserCompany, Financial
+from backend.backend.db.database import get_db
+from backend.backend.models.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData
+from backend.backend.models.models import User, UserCompany, Financial
 from passlib.context import CryptContext
 import jwt
 import logging
