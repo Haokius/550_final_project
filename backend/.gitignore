@@ -25,6 +25,7 @@ var/
 *.egg
 
 # Virtual environment
+cis550_project/
 venv/
 ENV/
 env/
