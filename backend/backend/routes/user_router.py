@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, delete, and_
-from backend.backend.db.database import get_db
-from backend.backend.models.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData
-from backend.backend.models.models import User, UserCompany, Financial
+from backend.db.database import get_db
+from backend.models.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData
+from backend.models.models import User, UserCompany, Financial
 from passlib.context import CryptContext
 import jwt
 import logging
@@ -14,6 +14,7 @@ import pandas as pd
 from typing import List
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, func
+
 
 #load_dotenv()
 

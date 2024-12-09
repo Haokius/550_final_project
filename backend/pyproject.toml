@@ -19,7 +19,7 @@ sec-edgar-api = "^1.1.0"
 ipython = "^8.29.0"
 tqdm = "^4.67.0"
 sqlalchemy = ">=2.0.0"
-pydantic-settings = "^2.0.0"
+pydantic-settings = "^2.6.1"
 asyncpg = "^0.30.0"
 greenlet = "^3.1.1"
 email-validator = "^2.2.0"
@@ -27,6 +27,8 @@ passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 pyjwt = "^2.10.0"
 psycopg2-binary = "^2.9.10"
 psycopg2 = "^2.9.10"
+python-dotenv = "^1.0.1"
+jwt = "^1.3.1"
 
 
 [build-system]
