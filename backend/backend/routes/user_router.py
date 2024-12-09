@@ -15,11 +15,11 @@ from typing import List
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, func
 
-load_dotenv()
+#load_dotenv()
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+#logging.basicConfig(level=logging.INFO)
+#logger = logging.getLogger(__name__)
 
 user_router = APIRouter(
     prefix="/users",
