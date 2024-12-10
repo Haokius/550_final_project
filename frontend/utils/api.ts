@@ -21,9 +21,12 @@ export const register = async (username: string, email: string, password: string
 
 export const login = async (email: string, password: string) => {
   try {
+    console.log('Attempting login with:', { email });
     const response = await api.post('/users/login', { email, password });
+    console.log('Login response:', response.status);
     return response.data;
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Login error:', error.response?.data || error.message);
     throw error;
   }
 };

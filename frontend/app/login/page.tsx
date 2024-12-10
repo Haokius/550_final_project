@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { login } from '@/utils/api'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -19,18 +20,16 @@ export default function Login() {
     e.preventDefault()
     setError('')
     try {
-      const response = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      if (response.ok) {
+      const data = await login(email, password)
+      if (data.token) {
+        localStorage.setItem('token', data.token)
         router.push('/dashboard')
       } else {
         setError('Login failed. Please check your credentials.')
       }
-    } catch (err) {
-      setError('An unexpected error occurred')
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.')
     }
   }
 
