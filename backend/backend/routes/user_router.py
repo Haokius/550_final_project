@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text, delete, and_
 from backend.db.database import get_db
-from backend.models.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData
+from backend.models.schemas import UserCreate, UserLogin, Token, CompanyList, CompanyDelete, CompanyData, OAuthUserCreate
 from backend.models.models import User, UserCompany, Financial
 from passlib.context import CryptContext
 import jwt
@@ -14,13 +14,6 @@ import pandas as pd
 from typing import List
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, func
-
-
-#load_dotenv()
-
-# Set up logging
-#logging.basicConfig(level=logging.INFO)
-#logger = logging.getLogger(__name__)
 
 user_router = APIRouter(
     prefix="/users",
@@ -35,6 +28,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Add this near the top with other initializations
 security = HTTPBearer()
+
+logger = logging.getLogger(__name__)
 
 @user_router.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
@@ -279,6 +274,48 @@ async def get_tracked_companies_data(
             
     except Exception as e:
         print(f"Error in get_tracked_companies_data: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+@user_router.post("/oauth")
+async def create_oauth_user(
+    user_data: OAuthUserCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        logger.info(f"1. Received OAuth request with data: {user_data}")
+        
+        # Check if user exists by email
+        result = await db.execute(
+            select(User).where(User.email == user_data.email)
+        )
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            logger.info(f"2. Found existing user: {existing_user.email}")
+            return {"message": "User already exists", "user_id": existing_user.id}
+        
+        logger.info("3. Creating new user...")
+        # Create unique username by appending email prefix
+        email_prefix = user_data.email.split('@')[0]
+        unique_username = f"{user_data.name}_{email_prefix}"
+        
+        # Create new user with unique username
+        new_user = User(
+            email=user_data.email,
+            username=unique_username,
+            provider=user_data.provider,
+            hashed_password=None
+        )
+        
+        db.add(new_user)
+        await db.commit()
+        logger.info(f"4. Successfully created user: {new_user.email}")
+        
+        return {"message": "User created successfully", "user_id": new_user.id}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"ERROR in OAuth: {str(e)}")
+        logger.exception("Full traceback:")
         raise HTTPException(status_code=400, detail=str(e))
 
 

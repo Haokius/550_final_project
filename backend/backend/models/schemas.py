@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 
 class UserCreate(BaseModel):
     username: str
@@ -29,3 +29,14 @@ class CompanyData(BaseModel):
     accounts_receivable: float | None
     inventory: float | None
     long_term_debt: float | None 
+
+class OAuthUserCreate(BaseModel):
+    email: str
+    name: str
+    provider: str
+
+    @validator('email')
+    def validate_email(cls, v):
+        if not v:
+            raise ValueError('Email cannot be empty')
+        return v 

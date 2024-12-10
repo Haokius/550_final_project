@@ -6,12 +6,15 @@ Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-
+    
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    tracked_companies = relationship("UserCompany", back_populates="user")
+    username = Column(String)
+    hashed_password = Column(String, nullable=True)  # nullable for OAuth users
+    provider = Column(String, nullable=True)  # 'google', 'facebook', etc.
+    
+    # Add this line to define the relationship
+    tracked_companies = relationship("UserCompany", back_populates="user", cascade="all, delete-orphan")
 
 class UserCompany(Base):
     __tablename__ = "user_companies"
@@ -19,9 +22,10 @@ class UserCompany(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     cik = Column(Integer)
+    
+    # This relationship is already defined correctly
     user = relationship("User", back_populates="tracked_companies")
     
-    # Add unique constraint
     __table_args__ = (UniqueConstraint('user_id', 'cik', name='uq_user_company'),)
 
 class Financial(Base):
