@@ -11,7 +11,22 @@ general_router = APIRouter(
     tags=["api"],
 )
 
-@general_router.get("/stocks", response_model=List[Dict])
+@general_router.get("/stocks")
+async def get_stocks(db: AsyncSession = Depends(get_db)):
+    try:
+        query = text("""
+        SELECT DISTINCT ON (C.cik) C.cik, C.ticker, C.companyname
+        FROM companies C
+        JOIN stock_prices S ON C.ticker = S.ticker
+        ORDER BY C.cik, S.year DESC, S.month DESC
+        """)
+        result = await db.execute(query)
+        stocks = result.fetchall()
+        return [{"cik": stock.cik, "ticker": stock.ticker, "companyname": stock.companyname} for stock in stocks]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@general_router.get("/topstocks", response_model=List[Dict])
 async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     """
     Returns the top 10 stocks ranked by their average closing price, 

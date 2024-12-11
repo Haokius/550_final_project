@@ -22,7 +22,7 @@ export default function Register() {
     try {
       const data = await register(username, email, password)
       localStorage.setItem('token', data.token)
-      router.push('/dashboard')
+      router.push('/profile')
     } catch (err) {
       setError('Registration failed. Please try again.')
     }

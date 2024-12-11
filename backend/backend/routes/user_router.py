@@ -13,7 +13,7 @@ import pandas as pd
 from typing import List
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import and_, func
-from jwt import encode, decode
+import jwt
 
 user_router = APIRouter(
     prefix="/users",
@@ -48,7 +48,7 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
         await db.commit()
         
         # Create token
-        token = encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
+        token = jwt.encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
         return {"token": token}
     except Exception as e:
         await db.rollback()
@@ -79,7 +79,7 @@ async def login_user(user: UserLogin, db: AsyncSession = Depends(get_db)):
         logger.info("Password verified, generating token...")
         
         # Create token
-        token = encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
+        token = jwt.encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
         
         logger.info("Login successful")
         return {"token": token}
@@ -99,7 +99,7 @@ async def logout_user(credentials: HTTPAuthorizationCredentials = Depends(securi
     
     try:
         # Verify the token is valid
-        decoded = decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        decoded = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
         print(f"DEBUG: Successfully decoded token: {decoded}")
         return {"message": "Successfully logged out"}
     except Exception as e:
@@ -114,7 +114,7 @@ async def track_companies(
 ):
     try:
         # Verify token and get user email
-        payload = decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
         email = payload["email"]
         
         # Get user
@@ -160,7 +160,7 @@ async def untrack_company(
 ):
     try:
         # Verify token and get user email
-        payload = decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
         email = payload["email"]
         
         # Get user
@@ -193,7 +193,7 @@ async def delete_user(
 ):
     try:
         # Verify token and get user email
-        payload = decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
         email = payload["email"]
         
         # Find and delete user
@@ -229,7 +229,7 @@ async def get_tracked_companies_data(
 ):
     try:
         # Verify token and get user email
-        payload = decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
         email = payload["email"]
         
         # Get user
@@ -337,5 +337,4 @@ async def create_oauth_user(
         logger.error(f"ERROR in OAuth: {str(e)}")
         logger.exception("Full traceback:")
         raise HTTPException(status_code=400, detail=str(e))
-
 
