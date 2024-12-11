@@ -31,7 +31,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div style={{ marginBottom: '50px' }}>
+        <div style={{ marginBottom: '70px' }}>
           <Menubar />
         </div>
         <AuthProvider>{children}</AuthProvider>
