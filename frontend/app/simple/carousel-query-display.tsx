@@ -5,6 +5,10 @@ import { CarouselOptions } from './carousel-options'
 import { QueryPopup } from './query-popup'
 import { ResultsDisplay } from './results-display'
 
+import axios from 'axios'
+import { ShuffleIcon } from 'lucide-react'
+
+
 export interface QueryOption {
   id: string
   title: string
@@ -51,19 +55,41 @@ export function CarouselQueryDisplay() {
     setSelectedOption(null)
   }
 
-  const handleSubmitQuery = async (queryId: string) => {
+  const handleSubmitQuery = async (queryId: string | undefined) => {
     // Simulate API call with setTimeout
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    // await new Promise((resolve) => setTimeout(resolve, 1000))
 
-    const mockResults: QueryResult[] = [
-      { id: '1', title: 'Result 1', content: `${selectedOption?.title}` },
-      { id: '2', title: 'Result 2', content: 'Sample content for result 2' },
-      { id: '3', title: 'Result 3', content: 'Sample content for result 3' },
-    ]
+    // const mockResults: QueryResult[] = [
+    //   { id: '1', title: 'Result 1', content: `${selectedOption?.title}` },
+    //   { id: '2', title: 'Result 2', content: 'Sample content for result 2' },
+    //   { id: '3', title: 'Result 3', content: 'Sample content for result 3' },
+    // ]
 
-    console.log("query id: ", queryId);
+    if (!queryId) {
+        console.error("Query ID is undefined");
+        return;
+    }
 
-    setResults(mockResults)
+    const queryUrlMap = {
+      '1': "/stocks",
+      '2': "/companies/high_cash_minimal_debt",
+      '3': "/stocks/monthly_avg_close",
+      '4': "/companies/debt_to_asset_ratio",
+      '5': "/companies/debt_to_asset_ratio",
+      '6': "/stocks/monthly_avg_close",
+    };
+
+    try {
+        const suffixUrl = queryUrlMap[queryId as keyof typeof queryUrlMap]
+        console.log(suffixUrl)
+        const response = await axios.get(`http://localhost:8000/api${suffixUrl}`)
+        const data = response.data
+        console.log(data)
+        setResults(data)
+    } catch (err) {
+        console.error("Failed to fetch data:", err);
+        alert("An error occurred while fetching data. Please try again later.");
+    }
     setIsPopupOpen(false)
   }
 

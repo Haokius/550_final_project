@@ -16,11 +16,14 @@ export function ResultsDisplay({ results }: ResultsDisplayProps) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {results.map((result) => (
           <Card key={result.id}>
-            <CardHeader>
-              <CardTitle>{result.title}</CardTitle>
-            </CardHeader>
+            <div style={{ height: '20px' }}></div>
             <CardContent>
-              <p>{result.content}</p>
+              {/* Iterate over the properties of the result object */}
+              {Object.entries(result).map(([key, value]) => (
+                <p key={key}>
+                  <strong>{key}:</strong> {value ? value : "N/A"}
+                </p>
+              ))}
             </CardContent>
           </Card>
         ))}
