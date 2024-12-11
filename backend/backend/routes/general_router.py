@@ -11,6 +11,7 @@ general_router = APIRouter(
     tags=["api"],
 )
 
+# TODO: Fix first three backend endpoints
 @general_router.get("/stocks", response_model=List[Dict])
 async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     """
