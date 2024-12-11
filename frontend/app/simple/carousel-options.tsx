@@ -9,17 +9,22 @@ import { QueryOption } from './carousel-query-display'
 interface CarouselOptionsProps {
   options: QueryOption[]
   onOptionClick: (option: QueryOption) => void
+  onOptionChange: (index: number) => void
 }
 
-export function CarouselOptions({ options, onOptionClick }: CarouselOptionsProps) {
+export function CarouselOptions({ options, onOptionClick, onOptionChange }: CarouselOptionsProps) {
   const [currentIndex, setCurrentIndex] = React.useState(0)
 
   const nextSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % options.length)
+    const newIndex = (currentIndex + 1) % options.length
+    setCurrentIndex(newIndex)
+    onOptionChange(newIndex)
   }
 
   const prevSlide = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + options.length) % options.length)
+    const newIndex = (currentIndex - 1 + options.length) % options.length
+    setCurrentIndex(newIndex)
+    onOptionChange(newIndex)
   }
 
   return (

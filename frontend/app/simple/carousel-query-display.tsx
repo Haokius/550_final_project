@@ -36,9 +36,14 @@ export function CarouselQueryDisplay() {
   const [isPopupOpen, setIsPopupOpen] = React.useState(false)
   const [results, setResults] = React.useState<QueryResult[]>([])
 
+  const clearResults = () => {
+    setResults([]);
+  }
+
   const handleOptionClick = (option: QueryOption) => {
     setSelectedOption(option)
     setIsPopupOpen(true)
+    clearResults()
   }
 
   const handleClosePopup = () => {
@@ -65,7 +70,11 @@ export function CarouselQueryDisplay() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Simple Query Options</h1>
-      <CarouselOptions options={queryOptions} onOptionClick={handleOptionClick} />
+      <CarouselOptions
+        options={queryOptions}
+        onOptionClick={handleOptionClick}
+        onOptionChange={clearResults}
+        />
       <QueryPopup
         isOpen={isPopupOpen}
         onClose={handleClosePopup}
