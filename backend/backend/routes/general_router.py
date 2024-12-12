@@ -84,7 +84,19 @@ async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
     Returns companies where cash reserves exceed half of liabilities, along with
     a rolling average of cash reserves over the last three periods.
     """
-    query = text("""YOUR EXISTING QUERY""")  # Keep your existing query
+    query = text("""
+    WITH FinancialStats AS (
+    SELECT F.CIK, F.Assets, F.Liabilities, F.CashAndCashEquivalentsAtCarryingValue,
+            AVG(F.CashAndCashEquivalentsAtCarryingValue) OVER (PARTITION BY F.CIK ORDER BY F.CCP ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS RollingAvgCash
+    FROM Financials F
+    )
+    SELECT F.CIK, C.CompanyName, F.Assets, F.Liabilities, F.CashAndCashEquivalentsAtCarryingValue, RollingAvgCash
+    FROM FinancialStats F
+    JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+    WHERE F.CashAndCashEquivalentsAtCarryingValue > (0.5 * F.Liabilities)
+    ORDER BY F.CashAndCashEquivalentsAtCarryingValue DESC
+    LIMIT 10;
+    """)  # Keep your existing query
     try:
         result = await db.execute(query)
         results = result.all()
@@ -107,8 +119,24 @@ async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
 # Continue this pattern for each endpoint...
 @general_router.get("/companies/debt_to_asset_ratio", response_model=List[Dict])
 async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
-    """Your existing docstring"""
-    query = text("""YOUR EXISTING QUERY""")
+    """
+    This query calculates the debt-to-asset ratio for each company and joins
+    it with stock price data to analyze average volatility.
+    """
+    query = text("""
+    WITH DebtRatios AS (
+    SELECT CAST(F.CIK AS VARCHAR) AS CIK,
+            (F.LongTermDebt / NULLIF(F.Assets, 0)) AS DebtToAssetRatio
+    FROM Financials F
+    WHERE F.Assets > 0 AND F.LongTermDebt IS NOT NULL
+    )
+    SELECT D.CIK, C.CompanyName, S.Ticker, DebtToAssetRatio, AVG(S.High - S.Low) AS AvgVolatility
+    FROM DebtRatios D
+    JOIN companies C ON D.CIK = CAST(C.CIK AS VARCHAR)
+    JOIN StockPrices S ON C.Ticker = S.Ticker
+    GROUP BY D.CIK, C.CompanyName, S.Ticker, DebtToAssetRatio
+    ORDER BY AvgVolatility DESC
+    LIMIT 10;""")
     try:
         result = await db.execute(query)
         results = result.all()
