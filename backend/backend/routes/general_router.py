@@ -11,29 +11,17 @@ general_router = APIRouter(
     tags=["api"],
 )
 
-@general_router.get("/stocks")
-async def get_stocks(db: AsyncSession = Depends(get_db)):
-    try:
-        query = text("""
-        SELECT DISTINCT ON (C.cik) C.cik, C.ticker, C.companyname
-        FROM companies C
-        JOIN stock_prices S ON C.ticker = S.ticker
-        ORDER BY C.cik, S.year DESC, S.month DESC
-        """)
-        result = await db.execute(query)
-        stocks = result.fetchall()
-        return [{"cik": stock.cik, "ticker": stock.ticker, "companyname": stock.companyname} for stock in stocks]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@general_router.get("/topstocks", response_model=List[Dict])
+
+# TODO: Fix first three backend endpoints
+@general_router.get("/stocks/top_stocks", response_model=List[Dict])
 async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     """
     Returns the top 10 stocks ranked by their average closing price, 
     along with the highest, lowest, and average closing prices, 
     company name, and financial details.
     """
-    query = text("""
+
+    og_text = """
     WITH StockPriceStats AS (
         SELECT S.ticker,
                MAX(S.high) AS highest_price,
@@ -42,7 +30,7 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
         FROM stock_prices S
         GROUP BY S.ticker
     )
-    SELECT 
+    SELECT DISTINCT
         S.ticker, 
         C.cik, 
         C.companyname, 
@@ -56,7 +44,31 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     JOIN financials F ON C.cik = F.cik
     ORDER BY S.avg_close DESC
     LIMIT 10;
-    """)
+    """
+
+    trial_text = """
+    WITH StockPriceStats AS (
+        SELECT S.ticker,
+               MAX(S.high) AS highest_price,
+               MIN(S.low) AS lowest_price,
+               AVG(S.close) AS avg_close
+        FROM stock_prices S
+        GROUP BY S.ticker
+    )
+    SELECT DISTINCT
+        S.ticker, 
+        C.cik, 
+        C.companyname, 
+        S.highest_price, 
+        S.lowest_price, 
+        S.avg_close
+    FROM StockPriceStats S
+    JOIN companies C ON S.ticker = C.ticker
+    ORDER BY S.avg_close DESC
+    LIMIT 10;
+    """
+
+    query = text(trial_text)
     try:
         result = await db.execute(query)
         results = result.all()
@@ -70,8 +82,8 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
                 "highest_price": row.highest_price,
                 "lowest_price": row.lowest_price,
                 "avg_close": row.avg_close,
-                "assets": row.assets,
-                "liabilities": row.liabilities,
+                # "assets": row.assets,
+                # "liabilities": row.liabilities,
             }
             for row in results
         ]
