@@ -19,9 +19,9 @@ export function ResultCard({ result }: ResultCardProps) {
       </CardHeader>
       <CardContent>
         {features.map(feature => (
-          <p key={feature} className="text-sm text-gray-500 capitalize">
-            {feature}: {typeof result[feature] === 'number' ? result[feature].toLocaleString() : result[feature]}
-          </p>
+            <p key={feature} className="text-sm text-gray-500 capitalize">
+                {feature}: {result[feature] === null ? 'N/A' : (typeof result[feature] === 'number' ? result[feature].toLocaleString() : result[feature])}
+            </p>
         ))}
       </CardContent>
     </Card>
