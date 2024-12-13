@@ -25,15 +25,17 @@ async def get_stocks(db: AsyncSession = Depends(get_db)):
         return [{"cik": stock.cik, "ticker": stock.ticker, "companyname": stock.companyname} for stock in stocks]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-@general_router.get("/topstocks", response_model=List[Dict])
+
+# TODO: Fix first three backend endpoints
+@general_router.get("/stocks/top_stocks", response_model=List[Dict])
 async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     """
     Returns the top 10 stocks ranked by their average closing price, 
     along with the highest, lowest, and average closing prices, 
     company name, and financial details.
     """
-    query = text("""
+
+    og_text = """
     WITH StockPriceStats AS (
         SELECT S.ticker,
                MAX(S.high) AS highest_price,
@@ -42,7 +44,7 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
         FROM stock_prices S
         GROUP BY S.ticker
     )
-    SELECT 
+    SELECT DISTINCT
         S.ticker, 
         C.cik, 
         C.companyname, 
@@ -56,7 +58,31 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     JOIN financials F ON C.cik = F.cik
     ORDER BY S.avg_close DESC
     LIMIT 10;
-    """)
+    """
+
+    trial_text = """
+    WITH StockPriceStats AS (
+        SELECT S.ticker,
+               MAX(S.high) AS highest_price,
+               MIN(S.low) AS lowest_price,
+               AVG(S.close) AS avg_close
+        FROM stock_prices S
+        GROUP BY S.ticker
+    )
+    SELECT DISTINCT
+        S.ticker, 
+        C.cik, 
+        C.companyname, 
+        S.highest_price, 
+        S.lowest_price, 
+        S.avg_close
+    FROM StockPriceStats S
+    JOIN companies C ON S.ticker = C.ticker
+    ORDER BY S.avg_close DESC
+    LIMIT 10;
+    """
+
+    query = text(trial_text)
     try:
         result = await db.execute(query)
         results = result.all()
@@ -70,8 +96,8 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
                 "highest_price": row.highest_price,
                 "lowest_price": row.lowest_price,
                 "avg_close": row.avg_close,
-                "assets": row.assets,
-                "liabilities": row.liabilities,
+                # "assets": row.assets,
+                # "liabilities": row.liabilities,
             }
             for row in results
         ]
@@ -599,3 +625,55 @@ async def get_companies_with_financial_improvement(db: AsyncSession = Depends(ge
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
+
+from pydantic import BaseModel
+class SearchCriterion(BaseModel):
+    feature: str
+    operator: str
+    value: str
+    logicalOperator: str
+
+class SearchRequest(BaseModel):
+    criteria: List[SearchCriterion]
+
+@general_router.post("/search")
+async def search_financials(request: SearchRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Searches the financials table based on the provided criteria.
+    Each criterion should specify a feature, operator, value, and logical operator.
+    """
+
+    try:
+        criteria = request.criteria
+
+        query = []
+        for i, criterion in enumerate(criteria):
+            if i > 0:
+                query.append(f"{criterion.logicalOperator} {criterion.feature} {criterion.operator} '{criterion.value}'")
+            else:
+                query.append(f"{criterion.feature} {criterion.operator} '{criterion.value}'")
+
+        query_string = " ".join(query)
+        full_query = f"SELECT * FROM Financials WHERE {query_string} LIMIT 50"
+        response = await db.execute(text(full_query))
+        result = response.all()
+        if not result:
+            return []
+        return [
+            {
+                "CIK": row.cik,
+                "Year": row.year,
+                "Month": row.month,
+                "Accounts Payable Current": row.accounts_payable_current,
+                "Assets": row.assets,
+                "Liabilities": row.liabilities,
+                "Cash and Equivalents": row.cash_and_equivalents,
+                "Accounts Receivable Current": row.accounts_receivable_current,
+                "Inventory Net": row.inventory_net,
+                "Long Term Debt": row.long_term_debt,
+            }
+            for row in result
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
