@@ -11,7 +11,7 @@ SheetTrigger,
 import { cn } from '@/lib/utils'
 
 const menuItems = [
-{ name: 'User Profile', href: '/dashboard' },
+{ name: 'User Profile', href: '/profile' },
 { name: 'Search', href: '/search' },
 { name: "Simple Queries", href: '/simple'},
 { name: 'Complex Queries', href: '/complex' },
