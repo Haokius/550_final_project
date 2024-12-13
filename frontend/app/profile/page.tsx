@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getUserProfile, getSavedCompanies, removeCompany, addCompany, getAvailableCompanies } from '@/utils/api'
+import { getUserProfile, getSavedCompanies, removeCompany, addCompany, getAvailableCompanies, logout } from '@/utils/api'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -23,6 +23,7 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { CompanyDetails } from '@/components/ui/CompanyDetails'
+import { useSession } from 'next-auth/react'
 
 interface UserProfile {
   id: number;
@@ -46,6 +47,7 @@ interface AvailableCompany {
 }
 
 export default function UserProfile() {
+  const { data: session, status } = useSession()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [companies, setCompanies] = useState<SavedCompany[]>([])
   const [availableCompanies, setAvailableCompanies] = useState<AvailableCompany[]>([])
@@ -60,46 +62,48 @@ export default function UserProfile() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token')
-        if (!token) {
-          console.log('No token found, redirecting to login')
-          router.push('/login')
-          return
+        console.log('Status:', status);
+        console.log('Full session:', session);
+        console.log('Backend token:', session?.backendToken);
+
+        if (status === 'loading') {
+          console.log('Session is loading...');
+          return;
+        }
+
+        if (status === 'unauthenticated') {
+          console.log('User is not authenticated, redirecting to login');
+          router.push('/login');
+          return;
+        }
+
+        if (!session?.backendToken) {
+          console.error('No backend token in session');
+          throw new Error('Authentication token not found');
         }
 
         const [profileData, companiesData, availableCompaniesData] = await Promise.all([
           getUserProfile(),
           getSavedCompanies(),
           getAvailableCompanies()
-        ])
+        ]);
 
-        const nameMapping: Record<string, string> = availableCompaniesData.reduce((acc: Record<string, string>, company: AvailableCompany) => {
-          acc[company.cik] = company.companyname;
-          return acc;
-        }, {});
-
-        setProfile(profileData)
-        setCompanies(companiesData)
-        setAvailableCompanies(availableCompaniesData)
-        setCompanyNames(nameMapping)
-
+        setProfile(profileData);
+        setCompanies(companiesData);
+        setAvailableCompanies(availableCompaniesData);
       } catch (err: any) {
-        console.error('Error fetching data:', err)
-        const errorMessage = err.response?.status === 404 
-          ? "Unable to load profile. Please try again later."
-          : err.response?.data?.detail || err.message || 'Failed to load profile data'
-        setError(errorMessage)
-        if (err.response?.status === 401) {
-          localStorage.removeItem('token')
-          router.push('/login')
+        console.error('Error in profile page:', err);
+        setError(err.message);
+        if (err.message.includes('authentication') || err.response?.status === 401) {
+          router.push('/login');
         }
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchData()
-  }, [router])
+    fetchData();
+  }, [session, status, router]);
 
   const handleAddCompany = async (cik: string) => {
     try {
@@ -133,49 +137,25 @@ export default function UserProfile() {
     })
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    router.push('/login')
-  }
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const filteredCompanies = availableCompanies.filter(company => 
     company.companyname.toLowerCase().includes(searchTerm.toLowerCase()) ||
     company.ticker.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-4">
-        <Card className="w-full max-w-4xl mx-auto">
-          <CardHeader>
-            <CardTitle>Loading...</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-    )
+  if (status === 'loading' || loading) {
+    return <div>Loading...</div>;
   }
 
   if (error) {
-    return (
-      <div className="container mx-auto p-4">
-        <Card className="w-full max-w-4xl mx-auto">
-          <CardHeader>
-            <CardTitle>Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-red-500">{error}</div>
-            <div className="flex gap-4 mt-4">
-              <Button onClick={() => window.location.reload()}>
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={handleLogout}>
-                Return to Login
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
+    return <div>Error: {error}</div>;
   }
 
   return (
