@@ -31,6 +31,19 @@ security = HTTPBearer()
 
 logger = logging.getLogger(__name__)
 
+async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = int(payload["sub"])  # Convert string back to int
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
 @user_router.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
@@ -395,4 +408,42 @@ async def get_user_profile(credentials: HTTPAuthorizationCredentials = Depends(s
     except Exception as e:
         print(f"Error in /me: {str(e)}")
         raise HTTPException(status_code=401, detail=str(e))
+
+@user_router.get("/companies")
+async def get_saved_companies(user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    try:
+        # Join with companies table to get company details
+        query = """
+            SELECT DISTINCT c.cik, c.ticker, c.companyname, f.year, f.month,
+                   f.cash_and_equivalents, f.long_term_debt
+            FROM user_companies uc
+            JOIN companies c ON uc.cik = c.cik
+            JOIN financials f ON c.cik = f.cik
+            WHERE uc.user_id = :user_id
+            AND (f.year, f.month) = (
+                SELECT year, month
+                FROM financials f2
+                WHERE f2.cik = c.cik
+                ORDER BY year DESC, month DESC
+                LIMIT 1
+            )
+        """
+        result = await db.execute(text(query), {"user_id": user_id})
+        companies = result.fetchall()
+        
+        return [
+            {
+                "cik": str(company.cik),
+                "ticker": company.ticker,
+                "companyname": company.companyname,
+                "year": company.year,
+                "month": company.month,
+                "cash_and_equivalents": company.cash_and_equivalents,
+                "long_term_debt": company.long_term_debt
+            }
+            for company in companies
+        ]
+    except Exception as e:
+        print(f"Error in get_saved_companies: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
 
