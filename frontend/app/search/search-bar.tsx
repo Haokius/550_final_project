@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { SearchCriterion } from './search-criterion'
 import { Plus } from 'lucide-react'
+import { Toast } from '@/components/ui/toast'
 
 interface SearchCriterionType {
   feature: string
@@ -14,6 +15,10 @@ const initialCriterion: SearchCriterionType = { feature: '', operator: '', value
 
 export function SearchBar() {
   const [criteria, setCriteria] = useState<SearchCriterionType[]>([initialCriterion])
+
+  const resetCriteria = () => {
+    setCriteria([initialCriterion])
+  }
 
   const addCriterion = () => {
     setCriteria([...criteria, { ...initialCriterion }])
@@ -34,7 +39,16 @@ export function SearchBar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Submitting search criteria:', criteria)
+    // console.log('Submitting search criteria:', criteria)
+
+    const hasEmptyFields = criteria.some(criterion =>
+        !criterion.feature || !criterion.operator || !criterion.value
+    )
+    if (hasEmptyFields) {
+        console.error("Cannot submit since some fields are empty")
+        return
+    }
+
     try {
       const response = await fetch('http://localhost:8000/api/search', {
         method: 'POST',
@@ -66,7 +80,12 @@ export function SearchBar() {
         <Button type="button" onClick={addCriterion} variant="outline">
           <Plus className="h-4 w-4 mr-2" /> Add Criterion
         </Button>
-        <Button type="submit">Search</Button>
+        <div className="flex space-x-2">
+            <Button type="button" onClick={resetCriteria} variant="outline">
+            Reset
+            </Button>
+            <Button type="submit">Search</Button>
+        </div>
       </div>
     </form>
   )

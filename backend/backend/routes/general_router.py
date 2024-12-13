@@ -583,3 +583,55 @@ async def get_companies_with_financial_improvement(db: AsyncSession = Depends(ge
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
+
+from pydantic import BaseModel
+class SearchCriterion(BaseModel):
+    feature: str
+    operator: str
+    value: str
+    logicalOperator: str
+
+class SearchRequest(BaseModel):
+    criteria: List[SearchCriterion]
+
+@general_router.post("/search")
+async def search_financials(request: SearchRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Searches the financials table based on the provided criteria.
+    Each criterion should specify a feature, operator, value, and logical operator.
+    """
+
+    try:
+        criteria = request.criteria
+
+        query = []
+        for i, criterion in enumerate(criteria):
+            if i > 0:
+                query.append(f"{criterion.logicalOperator} {criterion.feature} {criterion.operator} '{criterion.value}'")
+            else:
+                query.append(f"{criterion.feature} {criterion.operator} '{criterion.value}'")
+
+        query_string = " ".join(query)
+        full_query = f"SELECT * FROM Financials WHERE {query_string} LIMIT 50"
+        response = await db.execute(text(full_query))
+        result = response.all()
+        if not result:
+            return []
+        return [
+            {
+                "CIK": row.cik,
+                "Year": row.year,
+                "Month": row.month,
+                "Accounts Payable Current": row.accounts_payable_current,
+                "Assets": row.assets,
+                "Liabilities": row.liabilities,
+                "Cash and Equivalents": row.cash_and_equivalents,
+                "Accounts Receivable Current": row.accounts_receivable_current,
+                "Inventory Net": row.inventory_net,
+                "Long Term Debt": row.long_term_debt,
+            }
+            for row in result
+        ]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
