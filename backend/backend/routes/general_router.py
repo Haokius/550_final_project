@@ -112,15 +112,15 @@ async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
     """
     query = text("""
     WITH FinancialStats AS (
-    SELECT F.CIK, F.Assets, F.Liabilities, F.CashAndCashEquivalentsAtCarryingValue,
-            AVG(F.CashAndCashEquivalentsAtCarryingValue) OVER (PARTITION BY F.CIK ORDER BY F.CCP ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS RollingAvgCash
-    FROM Financials F
+    SELECT F.cik, F.assets, F.liabilities, F.cash_and_equivalents,
+            AVG(F.cash_and_equivalents) OVER (PARTITION BY F.cik ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS RollingAvgCash
+    FROM financials F
     )
-    SELECT F.CIK, C.CompanyName, F.Assets, F.Liabilities, F.CashAndCashEquivalentsAtCarryingValue, RollingAvgCash
+    SELECT F.cik, C.companyname, F.assets, F.liabilities, F.cash_and_equivalents, RollingAvgCash
     FROM FinancialStats F
-    JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
-    WHERE F.CashAndCashEquivalentsAtCarryingValue > (0.5 * F.Liabilities)
-    ORDER BY F.CashAndCashEquivalentsAtCarryingValue DESC
+    JOIN companies C ON CAST(F.cik AS VARCHAR) = CAST(C.cik AS VARCHAR)
+    WHERE F.cash_and_equivalents > (0.5 * F.liabilities)
+    ORDER BY F.cash_and_equivalents DESC
     LIMIT 10;
     """)  # Keep your existing query
     try:
@@ -135,7 +135,6 @@ async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
                 "assets": row.assets,
                 "liabilities": row.liabilities,
                 "cash_and_equivalents": row.cash_and_equivalents,
-                "rolling_avg_cash": row.rolling_avg_cash,
             }
             for row in results
         ]
@@ -151,17 +150,17 @@ async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
     """
     query = text("""
     WITH DebtRatios AS (
-    SELECT CAST(F.CIK AS VARCHAR) AS CIK,
-            (F.LongTermDebt / NULLIF(F.Assets, 0)) AS DebtToAssetRatio
-    FROM Financials F
-    WHERE F.Assets > 0 AND F.LongTermDebt IS NOT NULL
+    SELECT CAST(F.cik AS VARCHAR) AS CIK,
+            (F.long_term_debt / NULLIF(F.assets, 0)) AS DebtToAssetRatio
+    FROM financials F
+    WHERE F.assets > 0 AND F.long_term_debt IS NOT NULL
     )
-    SELECT D.CIK, C.CompanyName, S.Ticker, DebtToAssetRatio, AVG(S.High - S.Low) AS AvgVolatility
+    SELECT D.cik, C.companyname, S.ticker, DebtToAssetRatio as debt_to_asset_ratio, AVG(S.high - S.low) AS avg_volatility
     FROM DebtRatios D
-    JOIN companies C ON D.CIK = CAST(C.CIK AS VARCHAR)
-    JOIN StockPrices S ON C.Ticker = S.Ticker
-    GROUP BY D.CIK, C.CompanyName, S.Ticker, DebtToAssetRatio
-    ORDER BY AvgVolatility DESC
+    JOIN companies C ON D.cik = CAST(C.cik AS VARCHAR)
+    JOIN stock_prices S ON C.ticker = S.ticker
+    GROUP BY D.cik, C.companyname, S.ticker, DebtToAssetRatio
+    ORDER BY avg_volatility DESC
     LIMIT 10;""")
     try:
         result = await db.execute(query)
