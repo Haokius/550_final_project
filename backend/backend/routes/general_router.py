@@ -35,31 +35,6 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     company name, and financial details.
     """
 
-    og_text = """
-    WITH StockPriceStats AS (
-        SELECT S.ticker,
-               MAX(S.high) AS highest_price,
-               MIN(S.low) AS lowest_price,
-               AVG(S.close) AS avg_close
-        FROM stock_prices S
-        GROUP BY S.ticker
-    )
-    SELECT DISTINCT
-        S.ticker, 
-        C.cik, 
-        C.companyname, 
-        S.highest_price, 
-        S.lowest_price, 
-        S.avg_close, 
-        F.assets, 
-        F.liabilities
-    FROM StockPriceStats S
-    JOIN companies C ON S.ticker = C.ticker
-    JOIN financials F ON C.cik = F.cik
-    ORDER BY S.avg_close DESC
-    LIMIT 10;
-    """
-
     trial_text = """
     WITH StockPriceStats AS (
         SELECT S.ticker,
