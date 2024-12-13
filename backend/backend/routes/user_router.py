@@ -31,6 +31,19 @@ security = HTTPBearer()
 
 logger = logging.getLogger(__name__)
 
+async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = int(payload["sub"])  # Convert string back to int
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    except (KeyError, ValueError):
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
 @user_router.post("/register", response_model=Token)
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     try:
@@ -46,9 +59,15 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
         
         db.add(db_user)
         await db.commit()
+        await db.refresh(db_user)  # Refresh to get the ID
         
-        # Create token
-        token = jwt.encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
+        # Create token with 'sub' field
+        token = jwt.encode({
+            "email": user.email,
+            "sub": str(db_user.id),  # Add the user ID as 'sub'
+            "provider": "credentials"
+        }, SECRET_KEY, algorithm="HS256")
+        
         return {"token": token}
     except Exception as e:
         await db.rollback()
@@ -78,11 +97,15 @@ async def login_user(user: UserLogin, db: AsyncSession = Depends(get_db)):
         
         logger.info("Password verified, generating token...")
         
-        # Create token
-        token = jwt.encode({"email": user.email}, SECRET_KEY, algorithm="HS256")
+        # Create token with 'sub' field
+        token = jwt.encode({
+            "email": user.email,
+            "sub": str(db_user.id),  # Add the user ID as 'sub'
+            "provider": "credentials"
+        }, SECRET_KEY, algorithm="HS256")
         
         logger.info("Login successful")
-        return {"token": token}
+        return {"token": token, "user_id": db_user.id}
         
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
@@ -228,8 +251,13 @@ async def get_tracked_companies_data(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # Verify token and get user email
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
+        # Extract and verify token
+        token = credentials.credentials
+        print(f"Received token in /companies/data: {token[:20]}...")
+        
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        print(f"Decoded payload in /companies/data: {payload}")
+        
         email = payload["email"]
         
         # Get user
@@ -297,12 +325,14 @@ async def get_tracked_companies_data(
         raise HTTPException(status_code=400, detail=str(e))
 
 @user_router.post("/oauth")
-async def create_oauth_user(
-    user_data: OAuthUserCreate,
-    db: AsyncSession = Depends(get_db)
-):
+async def create_oauth_user(user_data: OAuthUserCreate, db: AsyncSession = Depends(get_db)):
     try:
         logger.info(f"1. Received OAuth request with data: {user_data}")
+        
+        # For Twitter, create an email using the username if email is not provided
+        if user_data.provider == 'twitter' and not user_data.email:
+            user_data.email = f"{user_data.name}@twitter.user"
+            logger.info(f"2. Created synthetic email for Twitter user: {user_data.email}")
         
         # Check if user exists by email
         result = await db.execute(
@@ -311,30 +341,109 @@ async def create_oauth_user(
         existing_user = result.scalar_one_or_none()
         
         if existing_user:
-            logger.info(f"2. Found existing user: {existing_user.email}")
-            return {"message": "User already exists", "user_id": existing_user.id}
+            logger.info(f"3. Found existing user: {existing_user.email}")
+            token = jwt.encode(
+                {
+                    "email": existing_user.email,
+                    "sub": str(existing_user.id),
+                    "provider": user_data.provider
+                }, 
+                SECRET_KEY, 
+                algorithm="HS256"
+            )
+            return {"token": token, "user_id": existing_user.id}
         
-        logger.info("3. Creating new user...")
-        # Create unique username by appending email prefix
-        email_prefix = user_data.email.split('@')[0]
-        unique_username = f"{user_data.name}_{email_prefix}"
+        logger.info("4. Creating new user...")
+        # For Twitter users, use their Twitter username
+        username = user_data.name if user_data.provider == 'twitter' else f"{user_data.name}_{user_data.email.split('@')[0]}"
         
-        # Create new user with unique username
         new_user = User(
             email=user_data.email,
-            username=unique_username,
+            username=username,
             provider=user_data.provider,
             hashed_password=None
         )
         
         db.add(new_user)
         await db.commit()
-        logger.info(f"4. Successfully created user: {new_user.email}")
+        await db.refresh(new_user)
         
-        return {"message": "User created successfully", "user_id": new_user.id}
+        logger.info(f"5. Successfully created user: {new_user.email}")
+        
+        token = jwt.encode(
+            {
+                "email": new_user.email,
+                "sub": str(new_user.id),
+                "provider": user_data.provider
+            }, 
+            SECRET_KEY, 
+            algorithm="HS256"
+        )
+        
+        return {"token": token, "user_id": new_user.id}
     except Exception as e:
         await db.rollback()
         logger.error(f"ERROR in OAuth: {str(e)}")
         logger.exception("Full traceback:")
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+@user_router.get("/me")
+async def get_user_profile(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        # Extract token from Bearer token
+        token = credentials.credentials
+        print(f"Received token in /me: {token[:20]}...")
+        
+        # Verify the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        print(f"Decoded payload in /me: {payload}")
+        
+        return {
+            "id": payload["sub"],
+            "email": payload["email"],
+            "provider": payload.get("provider"),
+            "username": payload["email"].split('@')[0]
+        }
+    except Exception as e:
+        print(f"Error in /me: {str(e)}")
+        raise HTTPException(status_code=401, detail=str(e))
+
+@user_router.get("/companies")
+async def get_saved_companies(user_id: int = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    try:
+        # Join with companies table to get company details
+        query = """
+            SELECT DISTINCT c.cik, c.ticker, c.companyname, f.year, f.month,
+                   f.cash_and_equivalents, f.long_term_debt
+            FROM user_companies uc
+            JOIN companies c ON uc.cik = c.cik
+            JOIN financials f ON c.cik = f.cik
+            WHERE uc.user_id = :user_id
+            AND (f.year, f.month) = (
+                SELECT year, month
+                FROM financials f2
+                WHERE f2.cik = c.cik
+                ORDER BY year DESC, month DESC
+                LIMIT 1
+            )
+        """
+        result = await db.execute(text(query), {"user_id": user_id})
+        companies = result.fetchall()
+        
+        return [
+            {
+                "cik": str(company.cik),
+                "ticker": company.ticker,
+                "companyname": company.companyname,
+                "year": company.year,
+                "month": company.month,
+                "cash_and_equivalents": company.cash_and_equivalents,
+                "long_term_debt": company.long_term_debt
+            }
+            for company in companies
+        ]
+    except Exception as e:
+        print(f"Error in get_saved_companies: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
 

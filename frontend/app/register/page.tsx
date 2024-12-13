@@ -20,11 +20,16 @@ export default function Register() {
     e.preventDefault()
     setError('')
     try {
-      const data = await register(username, email, password)
-      localStorage.setItem('token', data.token)
-      router.push('/profile')
-    } catch (err) {
-      setError('Registration failed. Please try again.')
+      console.log('Starting registration process...')
+      const response = await register(username, email, password)
+      
+      if (response) {
+        console.log('Registration successful, redirecting...')
+        router.push('/profile')
+      }
+    } catch (error: any) {
+      console.error('Registration error in component:', error)
+      setError(error.message || 'Registration failed, please try again')
     }
   }
 

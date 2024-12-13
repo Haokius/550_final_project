@@ -31,7 +31,7 @@ class CompanyData(BaseModel):
     long_term_debt: float | None 
 
 class OAuthUserCreate(BaseModel):
-    email: str
+    email: str | None = None
     name: str
     provider: str
 

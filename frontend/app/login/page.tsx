@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { signIn } from 'next-auth/react'
-import { login } from '../../utils/api'
+import { login } from '@/utils/api'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,46 +16,72 @@ export default function Login() {
   const [error, setError] = useState('')
   const router = useRouter()
 
+  // Regular email/password login
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     try {
-      const data = await login(email, password)
-      if (data.token) {
-        localStorage.setItem('token', data.token)
+      console.log('Starting login process with email:', email)
+      const response = await login(email, password)
+      
+      if (response) {
+        console.log('Login successful, redirecting...')
         router.push('/profile')
-      } else {
-        setError('Login failed. Please check your credentials.')
       }
-    } catch (err: any) {
-      console.error('Login error:', err);
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.')
+    } catch (error: any) {
+      console.error('Login error in component:', error)
+      setError(error.message || 'Invalid email or password')
     }
   }
 
-  const handleGoogleLogin = async () => {
-    console.log('1. Starting Google login...');
+  // Social login (Google/Twitter)
+  const handleSocialLogin = async (provider: string) => {
     try {
-      await signIn('google', { 
+      console.log(`Starting ${provider} login...`)
+      await signIn(provider, {
         callbackUrl: '/profile',
-      });
+      })
     } catch (error) {
-      console.error('Error during Google sign in:', error);
-      setError('An unexpected error occurred during Google login');
+      console.error(`Error during ${provider} sign in:`, error)
+      setError(`An unexpected error occurred during ${provider} login`)
     }
   }
 
-  const handleTwitterLogin = async () => {
-    console.log('1. Starting Twitter login...');
+  const handleGoogleSignIn = async () => {
     try {
-      await signIn('twitter', { 
-        callbackUrl: '/profile',
+      const result = await signIn('google', { 
+        redirect: false,
+        callbackUrl: '/profile' 
       });
+      
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.ok) {
+        router.push('/profile');
+      }
     } catch (error) {
-      console.error('Error during Twitter sign in:', error);
-      setError('An unexpected error occurred during Twitter login');
+      console.error('Google sign in error:', error);
+      setError('Failed to sign in with Google');
     }
-  }
+  };
+
+  const handleTwitterSignIn = async () => {
+    try {
+      const result = await signIn('twitter', { 
+        redirect: false,
+        callbackUrl: '/profile' 
+      });
+      
+      if (result?.error) {
+        setError(result.error);
+      } else if (result?.ok) {
+        router.push('/profile');
+      }
+    } catch (error) {
+      console.error('Twitter sign in error:', error);
+      setError('Failed to sign in with Twitter');
+    }
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -89,10 +115,10 @@ export default function Login() {
             <Button type="submit" className="w-full">Login</Button>
           </form>
           <div className="mt-4 space-y-2">
-            <Button onClick={handleGoogleLogin} variant="outline" className="w-full">
+            <Button onClick={handleGoogleSignIn} variant="outline" className="w-full">
               Login with Google
             </Button>
-            <Button onClick={handleTwitterLogin} variant="outline" className="w-full">
+            <Button onClick={handleTwitterSignIn} variant="outline" className="w-full">
               Login with Twitter
             </Button>
           </div>

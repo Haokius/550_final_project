@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { getSession, signIn, signOut } from 'next-auth/react';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -9,85 +10,138 @@ const api = axios.create({
   },
 });
 
-
+// List of endpoints that don't require authentication
+const PUBLIC_ENDPOINTS = [
+  '/users/login',
+  '/users/register',
+  '/users/oauth'
+];
 
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    try {
+      // Skip token check for public endpoints
+      if (PUBLIC_ENDPOINTS.some(endpoint => config.url?.includes(endpoint))) {
+        return config;
+      }
+
+      const session = await getSession();
+      console.log("Current session for API request:", session);
+      
+      if (session?.backendToken) {
+        console.log("Using backend token from session");
+        config.headers.Authorization = `Bearer ${session.backendToken}`;
+      } else {
+        console.log("No session token available");
+        throw new Error('No authentication token available');
+      }
+      
+      return config;
+    } catch (error) {
+      console.error("Error in request interceptor:", error);
+      return Promise.reject(error);
     }
-    
-    console.log('API Request:', {
-      url: config.url,
-      method: config.method,
-      headers: config.headers
-    });
-    return config;
   },
   (error) => {
-    console.error('Request Error:', error);
+    console.error('Request interceptor error:', error);
     return Promise.reject(error);
   }
 );
 
-// Add response interceptor for debugging
 api.interceptors.response.use(
-  (response) => {
-    console.log('API Response:', {
-      status: response.status,
-      data: response.data
-    });
-    return response;
-  },
-  (error) => {
-    console.error('Response Error:', {
-      status: error.response?.status,
-      data: error.response?.data
-    });
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized error (e.g., redirect to login)
+      window.location.href = '/login';
+    }
     return Promise.reject(error);
   }
 );
 
+// Regular login
 export const login = async (email: string, password: string) => {
   try {
+    console.log('1. Starting backend login process...');
     const response = await api.post('/users/login', { email, password });
-    return response.data;
-  } catch (error) {
+    console.log('2. Backend response:', response.data);
+    
+    if (response.data.token) {
+      console.log('3. Backend token received');
+      
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: email,
+        backendToken: response.data.token,
+      });
+
+      console.log('4. NextAuth sign in result:', result);
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.ok) {
+        return response.data;
+      }
+    }
+    throw new Error('Login failed');
+  } catch (error: any) {
     console.error('Login error:', error);
+    throw error;
+  }
+};
+
+// Add a logout function
+export const logout = async () => {
+  try {
+    await signOut({ redirect: true, callbackUrl: '/login' });
+  } catch (error) {
+    console.error('Logout error:', error);
     throw error;
   }
 };
 
 export const register = async (username: string, email: string, password: string) => {
   try {
-    const response = await api.post('/users/register', { username, email, password });
-    return response.data;
-  } catch (error) {
+    console.log('1. Starting registration process...');
+    const response = await api.post('/users/register', { 
+      username, 
+      email, 
+      password 
+    });
+    console.log('2. Registration response:', response.data);
+
+    if (response.data.token) {
+      console.log('3. Registration successful, signing in...');
+      const result = await signIn('credentials', {
+        redirect: false,
+        email: email,
+        backendToken: response.data.token,
+      });
+
+      console.log('4. Sign in result after registration:', result);
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      return response.data;
+    }
+    throw new Error('Registration successful but no token received');
+  } catch (error: any) {
+    console.error('Registration error:', error);
+    if (error.response?.data?.detail) {
+      throw new Error(error.response.data.detail);
+    }
     throw error;
   }
 };
 
-
-
-
-
 export const getUserProfile = async () => {
   try {
-    const token = localStorage.getItem('token');
-    if (!token) throw new Error('No token found');
-
-    const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-    const email = tokenPayload.email;
-
-    await api.get('/users/companies/data');
-
-    return {
-      email: email,
-      username: email.split('@')[0],
-      id: tokenPayload.sub || 0,
-      provider: null
-    };
+    const response = await api.get('/users/me');
+    return response.data;
   } catch (error) {
     console.error('Error fetching profile:', error);
     throw error;
@@ -95,13 +149,9 @@ export const getUserProfile = async () => {
 };
 
 export const getSavedCompanies = async () => {
-  try {
-    const response = await api.get('/users/companies/data');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching companies:', error);
-    throw error;
-  }
+  const response = await api.get('/users/companies');
+  console.log('Saved companies response:', response.data);
+  return response.data;
 };
 
 export const addCompany = async (ciks: string[]) => {
@@ -136,4 +186,6 @@ export const getAvailableCompanies = async () => {
     throw error;
   }
 };
+
+export default api;
 

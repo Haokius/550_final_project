@@ -21,7 +21,6 @@ export interface QueryResult {
   content: string
 }
 
-// NOTE: some of these are not right or simple
 const queryOptions: QueryOption[] = [
   { id: '1', title: 'Get Top Stocks', description: 'This query calculates the highest, lowest, and average closing prices for each stock, then ranks stocks by their average closing price and selects the top 10 stocks matching this criteria.' },
   { id: '2', title: 'Get Companies with Highest Cash Reserves', description: "Returns companies where cash reserves exceed half of liabilities, along with a rolling average of cash reserves over the last three periods."},
