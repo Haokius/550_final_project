@@ -21,7 +21,6 @@ export interface QueryResult {
   content: string
 }
 
-// NOTE: some of these are not right or simple
 const queryOptions: QueryOption[] = [
   { id: '1', title: 'Get Top Stocks', description: 'This query calculates the highest, lowest, and average closing prices for each stock, then ranks stocks by their average closing price and selects the top 10 stocks matching this criteria.' },
   { id: '2', title: 'Get Companies with Highest Cash Reserves', description: "Returns companies where cash reserves exceed half of liabilities, along witha rolling average of cash reserves over the last three periods."},
@@ -30,7 +29,7 @@ const queryOptions: QueryOption[] = [
   { id: '5', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
   { id: '6', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
   { id: '7', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
-  { id: '8', title: 'Get Greatest Leverage Differences', description: 'Discover new cooking recipes' },
+  { id: '8', title: 'Get Greatest Leverage Differences', description: 'This query identifies the top 10 companies with the greatest differences in leverage, providing insights into their financial stability and risk.' },
 ]
 
 export function CarouselQueryDisplay() {

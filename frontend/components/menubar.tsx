@@ -10,6 +10,7 @@ SheetTrigger,
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { Inter } from 'next/font/google'
+import router from 'next/router'
 
 const menuItems = [
 { name: 'User Profile', href: '/profile' },
@@ -28,9 +29,9 @@ return (
     <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
         <div className="flex-shrink-0">
-            <span className={`text-2xl font-bold text-gray-800 dark:text-gray-100 ${inter.className}`}>
+            <a href="/" className={`text-2xl font-bold text-gray-800 dark:text-gray-100 ${inter.className}`}>
                 Stockify
-            </span>
+            </a>
         </div>
         <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
