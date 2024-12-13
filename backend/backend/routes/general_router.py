@@ -91,7 +91,7 @@ async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
             AVG(F.cash_and_equivalents) OVER (PARTITION BY F.cik ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS RollingAvgCash
     FROM financials F
     )
-    SELECT F.cik, C.companyname, F.assets, F.liabilities, F.cash_and_equivalents, RollingAvgCash
+    SELECT DISTINCT F.cik, C.companyname, F.assets, F.liabilities, F.cash_and_equivalents, RollingAvgCash
     FROM FinancialStats F
     JOIN companies C ON CAST(F.cik AS VARCHAR) = CAST(C.cik AS VARCHAR)
     WHERE F.cash_and_equivalents > (0.5 * F.liabilities)
