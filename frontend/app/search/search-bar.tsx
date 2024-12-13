@@ -1,8 +1,10 @@
+'use client'
+
 import React, { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { SearchCriterion } from './search-criterion'
 import { Plus } from 'lucide-react'
-import { Toast } from '@/components/ui/toast'
+import { ResultCard } from './result-card'
 
 interface SearchCriterionType {
   feature: string
@@ -11,10 +13,17 @@ interface SearchCriterionType {
   logicalOperator: string
 }
 
+interface ResultType {
+    id: number,
+    [key: string]: any
+}
+
 const initialCriterion: SearchCriterionType = { feature: '', operator: '', value: '', logicalOperator: 'AND' }
 
 export function SearchBar() {
   const [criteria, setCriteria] = useState<SearchCriterionType[]>([initialCriterion])
+  const [results, setResults] = useState<ResultType[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   const resetCriteria = () => {
     setCriteria([initialCriterion])
@@ -39,14 +48,13 @@ export function SearchBar() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // console.log('Submitting search criteria:', criteria)
+    setIsLoading(true)
 
     const hasEmptyFields = criteria.some(criterion =>
         !criterion.feature || !criterion.operator || !criterion.value
     )
     if (hasEmptyFields) {
-        console.error("Cannot submit since some fields are empty")
-        return
+        return;
     }
 
     try {
@@ -58,13 +66,23 @@ export function SearchBar() {
         body: JSON.stringify({ criteria }),
       })
       const data = await response.json()
-      console.log('Search results:', data)
+      
+      const indexedData = data.map((item: any, index: number) => ({
+        ...item,
+        id: index + 1
+      }));
+
+      console.log(indexedData)
+      setResults(indexedData)
     } catch (error) {
       console.error('Error fetching search results:', error)
+    } finally {
+        setIsLoading(false)
     }
   }
 
   return (
+    <div className="space-y-8">
     <form onSubmit={handleSubmit} className="space-y-4">
       {criteria.map((criterion, index) => (
         <SearchCriterion
@@ -84,10 +102,23 @@ export function SearchBar() {
             <Button type="button" onClick={resetCriteria} variant="outline">
             Reset
             </Button>
-            <Button type="submit">Search</Button>
+            <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Searching...' : 'Search'}
+            </Button>
         </div>
       </div>
     </form>
+    {results.length > 0 && (
+        <div className="space-y-4">
+        <h2 className="text-xl font-semibold">Search Results</h2>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {results.map(result => (
+            <ResultCard key={result.id} result={result} />
+            ))}
+        </div>
+        </div>
+    )}
+    </div>
   )
 }
 
