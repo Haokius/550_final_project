@@ -38,6 +38,8 @@ interface SavedCompany {
   month: number;
   cash_and_equivalents: number;
   long_term_debt: number;
+  companyname: string;
+  ticker: string;
 }
 
 interface AvailableCompany {
@@ -51,7 +53,6 @@ export default function UserProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [companies, setCompanies] = useState<SavedCompany[]>([])
   const [availableCompanies, setAvailableCompanies] = useState<AvailableCompany[]>([])
-  const [companyNames, setCompanyNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isAddingCompany, setIsAddingCompany] = useState(false)
@@ -88,6 +89,8 @@ export default function UserProfile() {
           getAvailableCompanies()
         ]);
 
+        console.log('Companies data:', companiesData);
+        
         setProfile(profileData);
         setCompanies(companiesData);
         setAvailableCompanies(availableCompaniesData);
@@ -127,14 +130,19 @@ export default function UserProfile() {
     }
   }
 
-  const handleViewDetails = (name: string, cik: string) => {
-    const company = availableCompanies.find(c => c.cik === cik)
-    console.log('Selected company:', company)
+  const handleViewDetails = (companyName: string, cik: string) => {
+    const savedCompany = companies.find(c => c.cik === cik);
+    
+    const availableCompany = availableCompanies.find(c => c.cik === cik);
+    
+    console.log('View Details - Saved Company:', savedCompany);
+    console.log('View Details - Available Company:', availableCompany);
+    
     setSelectedCompany({ 
-      name, 
-      cik,
-      ticker: company?.ticker
-    })
+      name: companyName,
+      cik: cik,
+      ticker: savedCompany?.ticker || availableCompany?.ticker
+    });
   }
 
   const handleLogout = async () => {
@@ -236,7 +244,7 @@ export default function UserProfile() {
                       className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                     >
                       <div>
-                        <p className="font-medium">{companyNames[company.cik]}</p>
+                        <p className="font-medium text-lg">{company.companyname}</p>
                         <p className="text-sm text-gray-500">
                           Last Updated: {company.month}/{company.year}
                         </p>
@@ -245,7 +253,7 @@ export default function UserProfile() {
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => handleViewDetails(companyNames[company.cik], company.cik)}
+                          onClick={() => handleViewDetails(company.companyname, company.cik)}
                         >
                           View Details
                         </Button>

@@ -149,13 +149,9 @@ export const getUserProfile = async () => {
 };
 
 export const getSavedCompanies = async () => {
-  try {
-    const response = await api.get('/users/companies/data');
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching companies:', error);
-    throw error;
-  }
+  const response = await api.get('/users/companies');
+  console.log('Saved companies response:', response.data);
+  return response.data;
 };
 
 export const addCompany = async (ciks: string[]) => {
