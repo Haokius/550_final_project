@@ -9,6 +9,7 @@ SheetContent,
 SheetTrigger,
 } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
+import { Inter } from 'next/font/google'
 
 const menuItems = [
 { name: 'User Profile', href: '/profile' },
@@ -16,6 +17,8 @@ const menuItems = [
 { name: "Simple Queries", href: '/simple'},
 { name: 'Complex Queries', href: '/complex' },
 ]
+
+const inter = Inter({ subsets: ['latin'] })
 
 export function Menubar() {
 const [isOpen, setIsOpen] = React.useState(false)
@@ -25,7 +28,9 @@ return (
     <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
         <div className="flex-shrink-0">
-            <span className="text-2xl font-bold text-gray-800 dark:text-gray-100">FinEd App</span>
+            <span className={`text-2xl font-bold text-gray-800 dark:text-gray-100 ${inter.className}`}>
+                Stockify
+            </span>
         </div>
         <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
