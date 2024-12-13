@@ -24,13 +24,12 @@ export interface QueryResult {
 // NOTE: some of these are not right or simple
 const queryOptions: QueryOption[] = [
   { id: '1', title: 'Get Top Stocks', description: 'This query calculates the highest, lowest, and average closing prices for each stock, then ranks stocks by their average closing price and selects the top 10 stocks matching this criteria.' },
-  { id: '2', title: 'Get Companies with Highest Cash Reserves', description: "Returns companies where cash reserves exceed half of liabilities, along witha rolling average of cash reserves over the last three periods."},
-  { id: '3', title: 'Get Companies with Best Debt to Asset Ratio', description: "This query calculates the debt-to-asset ratio for each company and joinsit with stock price data to analyze average volatility."},
-  { id: '4', title: 'Get Companies with High Cash and Minimal Debt', description: 'This query identifies companies with substantial cash reserves (over $50 million) and minimal long-term debt (under $10 million), then retrieves the highest recorded closing price for each compan stock.' },
-  { id: '5', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
-  { id: '6', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
-  { id: '7', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
-  { id: '8', title: 'Get Greatest Leverage Differences', description: 'Discover new cooking recipes' },
+  { id: '2', title: 'Get Companies with Highest Cash Reserves', description: "Returns companies where cash reserves exceed half of liabilities, along with a rolling average of cash reserves over the last three periods."},
+  { id: '3', title: 'Get Companies with High Cash and Minimal Debt', description: 'This query identifies companies with substantial cash reserves (over $50 million) and minimal long-term debt (under $10 million), then retrieves the highest recorded closing price for each compan stock.' },
+  { id: '4', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
+  { id: '5', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
+  { id: '6', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
+  { id: '7', title: 'Get Greatest Leverage Differences', description: 'Discover new cooking recipes' },
 ]
 
 export function CarouselQueryDisplay() {
@@ -62,12 +61,11 @@ export function CarouselQueryDisplay() {
     const queryUrlMap = {
       '1': "/stocks/top_stocks",
       '2': "/companies/high_cash_reserves",
-      '3': "/companies/debt_to_asset_ratio",
-      '4': "/companies/high_cash_minimal_debt",
-      '5': "/stocks/monthly_avg_close",
-      '6': "/stocks/highest-fluctuations",
-      '7': "/stocks/highest-liquidity-debt-ratio",
-      '8': "/companies/strong_liquidity",
+      '3': "/companies/high_cash_minimal_debt",
+      '4': "/stocks/monthly_avg_close",
+      '5': "/stocks/highest-fluctuations",
+      '6': "/stocks/highest-liquidity-debt-ratio",
+      '7': "/companies/strong_liquidity",
     };
 
     try {
