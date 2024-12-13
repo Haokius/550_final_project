@@ -24,15 +24,13 @@ export interface QueryResult {
 // NOTE: some of these are not right or simple
 const queryOptions: QueryOption[] = [
   { id: '1', title: 'Get Top Stocks', description: 'This query calculates the highest, lowest, and average closing prices for each stock, then ranks stocks by their average closing price and selects the top 10 stocks matching this criteria.' },
-  { id: '2', title: 'Get Companies with High Cash and Minimal Debt', description: 'This query identifies companies with substantial cash reserves (over $50 million) and minimal long-term debt (under $10 million), then retrieves the highest recorded closing price for each companys stock.' },
-  { id: '3', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
-  { id: '4', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
-  { id: '5', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
-  { id: '6', title: 'Get Greatest Leverage Differences', description: 'Discover new cooking recipes' },
-  { id: '7', title: 'Travel', description: 'Explore travel destinations' },
-  { id: '8', title: 'Books', description: 'Search for book recommendations' },
-  { id: '9', title: 'Jobs', description: 'Browse job listings' },
-  { id: '10', title: 'Events', description: 'Find upcoming events' },
+  { id: '2', title: 'Get Companies with Highest Cash Reserves', description: "TODO"},
+  { id: '3', title: 'Get Companies with Best Debt to Asset Ratio', description: "TODO"},
+  { id: '4', title: 'Get Companies with High Cash and Minimal Debt', description: 'This query identifies companies with substantial cash reserves (over $50 million) and minimal long-term debt (under $10 million), then retrieves the highest recorded closing price for each companys stock.' },
+  { id: '5', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
+  { id: '6', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
+  { id: '7', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
+  { id: '8', title: 'Get Greatest Leverage Differences', description: 'Discover new cooking recipes' },
 ]
 
 export function CarouselQueryDisplay() {
@@ -56,35 +54,26 @@ export function CarouselQueryDisplay() {
   }
 
   const handleSubmitQuery = async (queryId: string | undefined) => {
-    // Simulate API call with setTimeout
-    // await new Promise((resolve) => setTimeout(resolve, 1000))
-
-    // const mockResults: QueryResult[] = [
-    //   { id: '1', title: 'Result 1', content: `${selectedOption?.title}` },
-    //   { id: '2', title: 'Result 2', content: 'Sample content for result 2' },
-    //   { id: '3', title: 'Result 3', content: 'Sample content for result 3' },
-    // ]
-
     if (!queryId) {
         console.error("Query ID is undefined");
         return;
     }
 
     const queryUrlMap = {
-      '1': "/stocks",
-      '2': "/companies/high_cash_minimal_debt",
-      '3': "/stocks/monthly_avg_close",
-      '4': "/companies/debt_to_asset_ratio",
-      '5': "/companies/debt_to_asset_ratio",
-      '6': "/stocks/monthly_avg_close",
+      '1': "/stocks/top_stocks",
+      '2': "/companies/high_cash_reserves",
+      '3': "/companies/debt_to_asset_ratio",
+      '4': "/companies/high_cash_minimal_debt",
+      '5': "/stocks/monthly_avg_close",
+      '6': "/stocks/highest-fluctuations",
+      '7': "/stocks/highest-liquidity-debt-ratio",
+      '8': "/companies/strong_liquidity",
     };
 
     try {
         const suffixUrl = queryUrlMap[queryId as keyof typeof queryUrlMap]
-        console.log(suffixUrl)
         const response = await axios.get(`http://localhost:8000/api${suffixUrl}`)
         const data = response.data
-        console.log(data)
         setResults(data)
     } catch (err) {
         console.error("Failed to fetch data:", err);
@@ -96,6 +85,7 @@ export function CarouselQueryDisplay() {
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Simple Query Options</h1>
+      <p className="mb-4">Browse through our curated selection of financial queries to gain insights into the market. From top-performing stocks to companies with strong liquidity, our queries are designed to help you make informed decisions.</p>
       <CarouselOptions
         options={queryOptions}
         onOptionClick={handleOptionClick}

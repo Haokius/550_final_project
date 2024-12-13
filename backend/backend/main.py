@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes.router import router
+from backend.routes.router import router
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import logging
