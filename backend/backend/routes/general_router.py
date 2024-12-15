@@ -125,18 +125,31 @@ async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
     """
     query = text("""
     WITH DebtRatios AS (
-    SELECT CAST(F.cik AS VARCHAR) AS CIK,
-            (F.long_term_debt / NULLIF(F.assets, 0)) AS DebtToAssetRatio
-    FROM financials F
-    WHERE F.assets > 0 AND F.long_term_debt IS NOT NULL
+        SELECT
+            F.cik AS CIK,
+            F.long_term_debt / NULLIF(F.assets, 0) AS DebtToAssetRatio
+        FROM financials F
+        WHERE F.assets > 0 AND F.long_term_debt IS NOT NULL
+    ),
+    AvgVolatility AS (
+        SELECT
+            S.ticker,
+            AVG(S.high - S.low) AS avg_volatility
+        FROM stock_prices S
+        GROUP BY S.ticker
     )
-    SELECT D.cik, C.companyname, S.ticker, DebtToAssetRatio as debt_to_asset_ratio, AVG(S.high - S.low) AS avg_volatility
+    SELECT
+        D.CIK,
+        C.companyname,
+        C.ticker,
+        D.DebtToAssetRatio AS debt_to_asset_ratio,
+        A.avg_volatility
     FROM DebtRatios D
-    JOIN companies C ON D.cik = CAST(C.cik AS VARCHAR)
-    JOIN stock_prices S ON C.ticker = S.ticker
-    GROUP BY D.cik, C.companyname, S.ticker, DebtToAssetRatio
-    ORDER BY avg_volatility DESC
-    LIMIT 10;""")
+    JOIN companies C ON D.CIK = C.cik
+    JOIN AvgVolatility A ON C.ticker = A.ticker
+    ORDER BY A.avg_volatility DESC
+    LIMIT 10;
+    """)
     try:
         result = await db.execute(query)
         results = result.all()
