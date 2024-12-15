@@ -440,54 +440,52 @@ async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_d
     for balanced execution time
     """
     query = text("""
-    WITH InitialDebtRatios AS (
-       SELECT F.CIK,
-              C.CompanyName,
-              F.inventory_net,
-              F.assets,
-              F.cash_and_equivalents,
-              F.liabilities,
-              (F.inventory_net / NULLIF(F.assets, 0)) AS InventoryToAssetRatio,
-              (F.cash_and_equivalents / NULLIF(F.liabilities, 0)) AS CashToLiabilityRatio
-       FROM Financials F
-       JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
-       WHERE F.inventory_net IS NOT NULL
-         AND F.assets IS NOT NULL
-         AND F.assets > 0
-         AND F.liabilities IS NOT NULL
+    WITH PreFiltered AS (
+    SELECT F.CIK, C.CompanyName,
+            F.inventory_net, F.assets, F.cash_and_equivalents, F.liabilities,
+            (F.inventory_net / NULLIF(F.assets, 0)) AS InventoryToAssetRatio,
+            (F.cash_and_equivalents / NULLIF(F.liabilities, 0)) AS CashToLiabilityRatio
+    FROM Financials F
+    JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+    WHERE F.inventory_net IS NOT NULL
+        AND F.assets > 0
+        AND F.liabilities IS NOT NULL
+        AND F.cash_and_equivalents IS NOT NULL
     ),
     FilteredDebtRatios AS (
-       SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities
-       FROM InitialDebtRatios
-       WHERE CashToLiabilityRatio > 0.2
+    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities
+    FROM PreFiltered
+    WHERE CashToLiabilityRatio > 0.2
     ),
     BucketedDebtRatios AS (
-       SELECT *, NTILE(5) OVER (ORDER BY InventoryToAssetRatio) AS bucket
-       FROM FilteredDebtRatios
+    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities,
+            NTILE(5) OVER (ORDER BY InventoryToAssetRatio) AS bucket
+    FROM FilteredDebtRatios
     ),
     CrossComparison AS (
-       SELECT R1.CIK AS "Company1", R1.CompanyName AS "Company1Name",
-              R2.CIK AS "Company2", R2.CompanyName AS "Company2Name",
-              ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) AS "RatioDifference",
-              (R1.CashToLiabilityRatio + R2.CashToLiabilityRatio) / 2 AS "AvgCashToLiabilityRatio",
-              (R1.assets + R2.assets) / 2 AS "AvgAssets",
-              (R1.liabilities + R2.liabilities) / 2 AS "AvgLiabilities"
-       FROM BucketedDebtRatios R1
-       JOIN BucketedDebtRatios R2 
-         ON R1.bucket = R2.bucket AND R1.CIK < R2.CIK
-       WHERE ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) < 0.1
-    ),
+    SELECT R1.CIK AS Company1, R1.CompanyName AS Company1Name,
+            R2.CIK AS Company2, R2.CompanyName AS Company2Name,
+            ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) AS RatioDifference,
+            (R1.CashToLiabilityRatio + R2.CashToLiabilityRatio) / 2 AS AvgCashToLiabilityRatio,
+            (R1.assets + R2.assets) / 2 AS AvgAssets,
+            (R1.liabilities + R2.liabilities) / 2 AS AvgLiabilities
+    FROM BucketedDebtRatios R1
+    JOIN BucketedDebtRatios R2
+        ON R1.bucket = R2.bucket AND R1.CIK < R2.CIK
+    WHERE ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) < 0.1
+        AND R1.bucket IS NOT NULL
+    LIMIT 5000),
     RankedComparison AS (
-       SELECT "Company1", "Company1Name", "Company2", "Company2Name", "RatioDifference", 
-              "AvgCashToLiabilityRatio", "AvgAssets", "AvgLiabilities",
-              ROW_NUMBER() OVER (PARTITION BY "Company1" ORDER BY "RatioDifference" ASC) AS "PairRank"
-       FROM CrossComparison
+    SELECT Company1, Company1Name, Company2, Company2Name, RatioDifference,
+            AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities,
+            ROW_NUMBER() OVER (PARTITION BY Company1 ORDER BY RatioDifference ASC) AS PairRank
+    FROM CrossComparison
     )
-    SELECT "Company1", "Company1Name", "Company2", "Company2Name", "RatioDifference", 
-           "AvgCashToLiabilityRatio", "AvgAssets", "AvgLiabilities"
+    SELECT Company1, Company1Name, Company2, Company2Name, RatioDifference,
+        AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities
     FROM RankedComparison
-    WHERE "PairRank" <= 20
-    ORDER BY "RatioDifference" ASC
+    WHERE PairRank <= 20
+    ORDER BY RatioDifference ASC
     LIMIT 1000;
     """)
     try:
