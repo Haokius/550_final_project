@@ -127,6 +127,8 @@ async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
     WITH DebtRatios AS (
         SELECT
             F.cik AS CIK,
+            F.year AS Year,
+            F.month AS Month,
             F.long_term_debt / NULLIF(F.assets, 0) AS DebtToAssetRatio
         FROM financials F
         WHERE F.assets > 0 AND F.long_term_debt IS NOT NULL
@@ -143,7 +145,9 @@ async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
         C.companyname,
         C.ticker,
         D.DebtToAssetRatio AS debt_to_asset_ratio,
-        A.avg_volatility
+        A.avg_volatility,
+        D.Month,
+        D.Year
     FROM DebtRatios D
     JOIN companies C ON D.CIK = C.cik
     JOIN AvgVolatility A ON C.ticker = A.ticker
@@ -162,6 +166,8 @@ async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
                 "ticker": row.ticker,
                 "debt_to_asset_ratio": row.debt_to_asset_ratio,
                 "avg_volatility": row.avg_volatility,
+                "year": row.year,
+                "month": row.month
             }
             for row in results
         ]
