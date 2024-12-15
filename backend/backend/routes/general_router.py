@@ -535,7 +535,7 @@ async def get_companies_with_strong_liquidity(db: AsyncSession = Depends(get_db)
     highlighting financially stable firms with strong liquidity.
     """
     query = text("""
-    SELECT F.CIK AS "cik", 
+    SELECT DISTINCT F.CIK AS "cik", 
            C.CompanyName AS "company_name", 
            F.cash_and_equivalents AS "cash_and_equivalents", 
            F.liabilities AS "liabilities",

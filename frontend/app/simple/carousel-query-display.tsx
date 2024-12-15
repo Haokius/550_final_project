@@ -29,7 +29,7 @@ const queryOptions: QueryOption[] = [
   { id: '3', title: 'Get Best Months for Stocks', description: 'This query calculates the monthly average close for each stock and ranks these averages in descending order, selecting the top 10 months with the highest average close prices.' },
   { id: '4', title: 'Get Highest Fluctutations', description: 'This query calculates the average monthly volatility for high-volume stocks, showing the top 10 months with the highest price fluctuations.' },
   { id: '5', title: 'Get Highest Liquidity Debt Ratio', description: 'This query identifies the top 10 companies with the highest cash-to-debt ratios, providing insights into their liquidity and financial stability.' },
-  { id: '6', title: 'Get Greatest Leverage Differences', description: 'This query calculates the difference between the highest and lowest leverage ratios for companies over a specified period, highlighting those with the greatest leverage differences.' },
+  { id: '6', title: 'Get Companies with Strongest Liquidity', description: 'This query identifies companies with cash reserves more than twice their liabilities, highlighting financially stable firms with strong liquidity.' },
 ]
 
 export function CarouselQueryDisplay() {
