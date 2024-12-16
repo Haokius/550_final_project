@@ -332,10 +332,69 @@ async def get_highest_liquidity_debt_ratio(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error querying database: {str(e)}")
     
-
-
-
+@general_router.get("/stock/advanced-trading-metrics")
+async def get_advanced_trading_metrics(db: AsyncSession = Depends(get_db)):
+    query = text("""
+        SELECT 
+            ranked.*
+        FROM (
+            SELECT 
+                c.companyname,
+                sp.ticker,
+                sp.year,
+                sp.month,
+                (MAX(sp.high) - MIN(sp.low)) / NULLIF(MIN(sp.low), 0) * 100 as volatility,
+                AVG((sp.high - sp.low) / NULLIF(sp.low, 0)) * 100 as avg_daily_range_pct,
+                AVG(CASE WHEN sp.close > (sp.high + sp.low)/2 THEN 1 ELSE 0 END) * 100 as upper_half_closes_pct,
+                SUM(sp.close * sp.volume) / NULLIF(SUM(sp.volume), 0) as vwap,
+                ((MAX(sp.close) - MIN(sp.close)) / MIN(sp.close)) * 100 as month_price_change_pct,
+                (f.cash_and_equivalents + f.accounts_receivable_current) / NULLIF(f.liabilities, 0) * 100 as quick_ratio,
+                f.cash_and_equivalents / NULLIF(f.liabilities, 0) * 100 as cash_ratio,
+                f.accounts_receivable_current / NULLIF(f.accounts_payable_current, 0) * 100 as ar_ap_ratio,
+                DENSE_RANK() OVER (PARTITION BY sp.year, sp.month ORDER BY (MAX(sp.high) - MIN(sp.low)) / NULLIF(MIN(sp.low), 0) * 100 DESC) as volatility_rank
+            FROM stock_prices sp
+            JOIN companies c ON sp.ticker = c.ticker
+            LEFT JOIN financials f ON c.cik = f.cik
+                AND sp.year = f.year 
+                AND sp.month = f.month
+            WHERE sp.year >= 2022
+            GROUP BY 
+                c.companyname,
+                sp.ticker,
+                sp.year,
+                sp.month,
+                f.cash_and_equivalents,
+                f.liabilities,
+                f.accounts_receivable_current,
+                f.accounts_payable_current
+        ) ranked
+        WHERE volatility_rank <= 10
+        ORDER BY year DESC, month DESC, volatility_rank
+        LIMIT 50;
+    """)
+    try:
+        result = await db.execute(query)
+        results = result.all()
+        if not results:
+            raise HTTPException(status_code=404, detail="No data found")
+        return [
+            {
+                "CompanyName": row.companyname,
+                "Ticker": row.ticker,
+                "Year": row.year,
+                "Month": row.month,
+                "Volatility": row.volatility,
+                "AvgDailyRangePct": row.avg_daily_range_pct,
+                "UpperHalfClosesPct": row.upper_half_closes_pct,
+                "VWAP": row.vwap,
+                "MonthPriceChangePct": row.month_price_change_pct,
+            }
+            for row in results
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
     
+
 @general_router.get("/stock/greatest-leverage-differences")
 async def get_greatest_leverage_differences(db: AsyncSession = Depends(get_db)):
     query = text("""
@@ -460,7 +519,7 @@ async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_d
     """
     query = text("""
     WITH PreFiltered AS (
-    SELECT F.CIK, C.CompanyName,
+    SELECT F.CIK, C.CompanyName, F.year, F.month,
             F.inventory_net, F.assets, F.cash_and_equivalents, F.liabilities,
             (F.inventory_net / NULLIF(F.assets, 0)) AS InventoryToAssetRatio,
             (F.cash_and_equivalents / NULLIF(F.liabilities, 0)) AS CashToLiabilityRatio
@@ -472,18 +531,18 @@ async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_d
         AND F.cash_and_equivalents IS NOT NULL
     ),
     FilteredDebtRatios AS (
-    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities
+    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities, year, month
     FROM PreFiltered
     WHERE CashToLiabilityRatio > 0.2
     ),
     BucketedDebtRatios AS (
-    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities,
+    SELECT CIK, CompanyName, InventoryToAssetRatio, CashToLiabilityRatio, assets, liabilities, year, month,
             NTILE(5) OVER (ORDER BY InventoryToAssetRatio) AS bucket
     FROM FilteredDebtRatios
     ),
     CrossComparison AS (
-    SELECT R1.CIK AS Company1, R1.CompanyName AS Company1Name,
-            R2.CIK AS Company2, R2.CompanyName AS Company2Name,
+    SELECT R1.CIK AS Company1, R1.CompanyName AS Company1Name, R1.year AS Company1Year, R1.month AS Company1Month,
+            R2.CIK AS Company2, R2.CompanyName AS Company2Name, R2.year AS Company2Year, R2.month AS Company2Month,
             ABS(R1.InventoryToAssetRatio - R2.InventoryToAssetRatio) AS RatioDifference,
             (R1.CashToLiabilityRatio + R2.CashToLiabilityRatio) / 2 AS AvgCashToLiabilityRatio,
             (R1.assets + R2.assets) / 2 AS AvgAssets,
@@ -496,12 +555,12 @@ async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_d
     LIMIT 5000),
     RankedComparison AS (
     SELECT Company1, Company1Name, Company2, Company2Name, RatioDifference,
-            AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities,
+            AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities, Company1Year, Company1Month, Company2Year, Company2Month,
             ROW_NUMBER() OVER (PARTITION BY Company1 ORDER BY RatioDifference ASC) AS PairRank
-    FROM CrossComparison
+    FROM CrossComparison 
     )
-    SELECT Company1, Company1Name, Company2, Company2Name, RatioDifference,
-        AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities
+    SELECT DISTINCT Company1, Company1Name, Company2, Company2Name, RatioDifference,
+        AvgCashToLiabilityRatio, AvgAssets, AvgLiabilities, Company1Year, Company1Month, Company2Year, Company2Month
     FROM RankedComparison
     WHERE PairRank <= 20
     ORDER BY RatioDifference ASC
@@ -510,18 +569,23 @@ async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_d
     try:
         result = await db.execute(query)
         results = result.all()
+        print("RESULTS:", results[0])
         if not results:
             raise HTTPException(status_code=404, detail="No data found")
         return [
             {
-                "Company1CIK": row.Company1,
-                "Company1Name": row.Company1Name,
-                "Company2CIK": row.Company2,
-                "Company2Name": row.Company2Name,
-                "RatioDifference": row.RatioDifference,
-                "AvgCashToLiabilityRatio": row.AvgCashToLiabilityRatio,
-                "AvgAssets": row.AvgAssets,
-                "AvgLiabilities": row.AvgLiabilities,
+                "Company1CIK": row[0],
+                "Company1Name": row[1],
+                "Company2CIK": row[2],
+                "Company2Name": row[3],
+                "RatioDifference": row[4],
+                "AvgCashToLiabilityRatio": row[5],
+                "AvgAssets": row[6],
+                "AvgLiabilities": row[7],
+                "Company1Year": row[8],
+                "Company1Month": row[9],
+                "Company2Year": row[10],
+                "Company2Month": row[11],
             }
             for row in results
         ]

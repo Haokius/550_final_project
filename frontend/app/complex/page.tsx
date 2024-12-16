@@ -26,7 +26,7 @@ const queryOptions: QueryOption[] = [
   { id: '1', title: 'Get Pairs of Companies with Similar Debt Ratios', description: 'This query identifies pairs of companies with similar debt-to-asset ratios, filtered for meaningful financial comparisons. It first calculates debt-to-asset ratios, then reduces the dataset by selecting every third company to optimize performance. Finally, it compares these ratios, focusing on pairs with a small difference and a significant average ratio, ranking the top 10 closest pairs.' },
   { id: '2', title: 'Get Companies with Significant Financial Improvement', description: "This query identifies companies with significant financial improvement over two years, specifically those that have increased cash reserves by more than 5% and reduced long-term debt by more than 5%."},
   { id: '3', title: 'Get Companies with Best Debt to Asset Ratio', description: "This query calculates the debt-to-asset ratio for each company and joins it with stock price data to analyze average volatility."},
-  { id: '4', title: 'Get Companies with the Greatest Leverage Differences', description: 'This query compares the debt-to-asset ratios of a large set of companies, identifying pairs with the greatest differences, and highlighting the top 10 pairs for insights into companies with significantly different leverage levels.' },
+  { id: '4', title: 'Get Advanced Trading Metrics of Companies', description: 'This query returns advanced trading metrics of companies, including volatility, average daily range, upper half closes, VWAP, month price change, and quick ratio.'},
   { id: '5', title: 'Get Pairs of Companies with Similar Inventory Ratios', description: "This query calculates the inventory-to-asset and cash-to-liability ratios for companies, filters for those with significant cash liquidity, and performs cross-comparisons between companies to find pairs with similar inventory-to-asset ratios."},
 ]
 
@@ -60,7 +60,7 @@ export function CarouselQueryDisplay() {
       '1': "/companies/similar_debt_ratios",
       '2': "/companies/financial_improvement",
       '3': "/companies/debt_to_asset_ratio",
-      '4': "/stock/greatest-leverage-differences",
+      '4': "/stock/advanced-trading-metrics",
       '5': "/companies/similar_inventory_ratios",
     };
 
