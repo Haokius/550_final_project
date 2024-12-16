@@ -447,68 +447,72 @@ async def get_greatest_leverage_differences(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Error querying database: {str(e)}")
     
 
-@general_router.get("/companies/similar_debt_ratios", response_model=List[Dict])
-async def get_similar_debt_ratios_faster(db: AsyncSession = Depends(get_db)):
-    """
-    Optimized query to identify pairs of companies with similar debt-to-asset ratios,
-    ensuring it runs faster by limiting pairwise comparisons using bucketing and stricter filters.
-    """
-    query = text("""
-    WITH FilteredFinancials AS (
-       SELECT F.CIK AS cik,
-              C.CompanyName AS company_name,
-              (F.long_term_debt / NULLIF(F.assets, 0)) AS debt_to_asset_ratio,
-              NTILE(10) OVER (ORDER BY (F.long_term_debt / NULLIF(F.assets, 0))) AS bucket
-       FROM Financials F
-       JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
-       WHERE F.assets > 0 
-         AND F.long_term_debt IS NOT NULL
-         AND MOD(CAST(F.CIK AS INTEGER), 3) = 0
-    ),
-    PairwiseComparison AS (
-       SELECT FF1.cik AS company1_cik, 
-              FF1.company_name AS company1_name,
-              FF2.cik AS company2_cik, 
-              FF2.company_name AS company2_name,
-              ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) AS ratio_difference,
-              (FF1.debt_to_asset_ratio + FF2.debt_to_asset_ratio) / 2 AS avg_debt_to_asset_ratio
-       FROM FilteredFinancials FF1
-       JOIN FilteredFinancials FF2 
-         ON FF1.bucket = FF2.bucket AND FF1.cik < FF2.cik
-       WHERE ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) < 0.05
-    ),
-    RankedPairs AS (
-       SELECT company1_cik, company1_name, 
-              company2_cik, company2_name, 
-              ratio_difference,
-              ROW_NUMBER() OVER (PARTITION BY company1_cik ORDER BY ratio_difference ASC) AS pair_rank
-       FROM PairwiseComparison
-    )
-    SELECT company1_cik, company1_name, 
-           company2_cik, company2_name, 
-           ratio_difference
-    FROM RankedPairs
-    WHERE pair_rank <= 10
-    ORDER BY ratio_difference ASC
-    LIMIT 300;
-    """)
-    try:
-        result = await db.execute(query)
-        results = result.all()
-        if not results:
-            raise HTTPException(status_code=404, detail="No data found")
-        return [
-            {
-                "Company1CIK": row.company1_cik,
-                "Company1Name": row.company1_name,
-                "Company2CIK": row.company2_cik,
-                "Company2Name": row.company2_name,
-                "RatioDifference": row.ratio_difference,
-            }
-            for row in results
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
+# @general_router.get("/companies/similar_debt_ratios", response_model=List[Dict])
+# async def get_similar_debt_ratios_faster(db: AsyncSession = Depends(get_db)):
+#     """
+#     Optimized query to identify pairs of companies with similar debt-to-asset ratios,
+#     ensuring it runs faster by limiting pairwise comparisons using bucketing and stricter filters.
+#     """
+#     query = text("""
+#     WITH FilteredFinancials AS (
+#        SELECT F.CIK AS cik,
+#               C.CompanyName AS company_name,
+#               (F.long_term_debt / NULLIF(F.assets, 0)) AS debt_to_asset_ratio,
+#               NTILE(10) OVER (ORDER BY (F.long_term_debt / NULLIF(F.assets, 0))) AS bucket
+#        FROM Financials F
+#        JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
+#        WHERE F.assets > 0 
+#          AND F.long_term_debt IS NOT NULL
+#          AND MOD(CAST(F.CIK AS INTEGER), 3) = 0
+#     ),
+#     PairwiseComparison AS (
+#        SELECT FF1.cik AS company1_cik, 
+#               FF1.company_name AS company1_name,
+#               FF2.cik AS company2_cik, 
+#               FF2.company_name AS company2_name,
+#               ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) AS ratio_difference,
+#               (FF1.debt_to_asset_ratio + FF2.debt_to_asset_ratio) / 2 AS avg_debt_to_asset_ratio
+#        FROM FilteredFinancials FF1
+#        JOIN FilteredFinancials FF2 
+#          ON FF1.bucket = FF2.bucket AND FF1.cik < FF2.cik
+#        WHERE ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) < 0.05
+#     ),
+#     RankedPairs AS (
+#        SELECT company1_cik, company1_name, 
+#               company2_cik, company2_name, 
+#               ratio_difference,
+#               ROW_NUMBER() OVER (PARTITION BY company1_cik ORDER BY ratio_difference ASC) AS pair_rank
+#        FROM PairwiseComparison
+#     )
+#     SELECT company1_cik, company1_name, 
+#            company2_cik, company2_name, 
+#            ratio_difference
+#     FROM RankedPairs
+#     WHERE pair_rank <= 10
+#     ORDER BY ratio_difference ASC
+#     LIMIT 300;
+#     """)
+#     try:
+#         import time
+#         start_time = time.time()
+#         result = await db.execute(query)
+#         results = result.all()
+#         end_time = time.time()
+#         print(f"Time taken: {end_time - start_time} seconds")
+#         if not results:
+#             raise HTTPException(status_code=404, detail="No data found")
+#         return [
+#             {
+#                 "Company1CIK": row.company1_cik,
+#                 "Company1Name": row.company1_name,
+#                 "Company2CIK": row.company2_cik,
+#                 "Company2Name": row.company2_name,
+#                 "RatioDifference": row.ratio_difference,
+#             }
+#             for row in results
+#         ]
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
 
 @general_router.get("/companies/similar_inventory_ratios", response_model=List[Dict])
