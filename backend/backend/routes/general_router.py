@@ -26,7 +26,6 @@ async def get_stocks(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# TODO: Fix first three backend endpoints
 @general_router.get("/stocks/top_stocks", response_model=List[Dict])
 async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     """
@@ -79,44 +78,6 @@ async def get_top_stocks(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
 
-@general_router.get("/companies/high_cash_reserves", response_model=List[Dict])
-async def get_companies_high_cash_reserves(db: AsyncSession = Depends(get_db)):
-    """
-    Returns companies where cash reserves exceed half of liabilities, along with
-    a rolling average of cash reserves over the last three periods.
-    """
-    query = text("""
-    WITH FinancialStats AS (
-    SELECT F.cik, F.assets, F.liabilities, F.cash_and_equivalents,
-            AVG(F.cash_and_equivalents) OVER (PARTITION BY F.cik ROWS BETWEEN 3 PRECEDING AND CURRENT ROW) AS RollingAvgCash
-    FROM financials F
-    )
-    SELECT DISTINCT F.cik, C.companyname, F.assets, F.liabilities, F.cash_and_equivalents, RollingAvgCash
-    FROM FinancialStats F
-    JOIN companies C ON CAST(F.cik AS VARCHAR) = CAST(C.cik AS VARCHAR)
-    WHERE F.cash_and_equivalents > (0.5 * F.liabilities)
-    ORDER BY F.cash_and_equivalents DESC
-    LIMIT 10;
-    """)  # Keep your existing query
-    try:
-        result = await db.execute(query)
-        results = result.all()
-        if not results:
-            raise HTTPException(status_code=404, detail="No data found")
-        return [
-            {
-                "cik": row.cik,
-                "companyname": row.companyname,
-                "assets": row.assets,
-                "liabilities": row.liabilities,
-                "cash_and_equivalents": row.cash_and_equivalents,
-            }
-            for row in results
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
-
-# Continue this pattern for each endpoint...
 @general_router.get("/companies/debt_to_asset_ratio", response_model=List[Dict])
 async def get_companies_debt_to_asset_ratio(db: AsyncSession = Depends(get_db)):
     """
@@ -393,127 +354,6 @@ async def get_advanced_trading_metrics(db: AsyncSession = Depends(get_db)):
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
-    
-
-@general_router.get("/stock/greatest-leverage-differences")
-async def get_greatest_leverage_differences(db: AsyncSession = Depends(get_db)):
-    query = text("""
-        WITH DebtToAssetRatios AS (
-            SELECT F.CIK, C.CompanyName,
-                    (F.long_term_debt / NULLIF(F.Assets, 0)) AS DebtToAssetRatio
-            FROM Financials F
-            JOIN companies C ON F.CIK::VARCHAR = C.CIK::VARCHAR
-            WHERE F.Assets > 0 AND F.long_term_debt IS NOT NULL
-        ),
-        TopDebtRatios AS (
-            SELECT CIK, CompanyName, DebtToAssetRatio,
-                    ROW_NUMBER() OVER (ORDER BY DebtToAssetRatio DESC) AS Rank
-            FROM DebtToAssetRatios
-            WHERE DebtToAssetRatio IS NOT NULL
-            LIMIT 5000
-        )
-        SELECT DISTINCT D1.CIK AS Company1, C1.CompanyName AS Company1Name,
-            D2.CIK AS Company2, C2.CompanyName AS Company2Name,
-            D1.DebtToAssetRatio AS Company1Ratio,
-            D2.DebtToAssetRatio AS Company2Ratio,
-            ABS(D1.DebtToAssetRatio - D2.DebtToAssetRatio) AS RatioDifference
-        FROM TopDebtRatios D1
-        JOIN TopDebtRatios D2
-        ON D1.CIK < D2.CIK
-        JOIN companies C1 ON D1.CIK = C1.CIK
-        JOIN companies C2 ON D2.CIK = C2.CIK
-        WHERE ABS(D1.DebtToAssetRatio - D2.DebtToAssetRatio) > 0.1
-        ORDER BY RatioDifference DESC
-        LIMIT 10;
-    """)
-    try:
-        result = await db.execute(query)
-        results = result.all()
-        if not results:
-            raise HTTPException(status_code=404, detail="No stock data found with the specified criteria")
-        return [
-            {
-                "Company1CIK": row.company1,
-                "Company1Name": row.company1name,
-                "Company2CIK": row.company2,
-                "Company2Name": row.company2name,
-                "Company1Ratio": row.company1ratio,
-                "Company2Ratio": row.company2ratio,
-                "RatioDifference": row.ratiodifference
-            }
-            for row in results
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error querying database: {str(e)}")
-    
-
-# @general_router.get("/companies/similar_debt_ratios", response_model=List[Dict])
-# async def get_similar_debt_ratios_faster(db: AsyncSession = Depends(get_db)):
-#     """
-#     Optimized query to identify pairs of companies with similar debt-to-asset ratios,
-#     ensuring it runs faster by limiting pairwise comparisons using bucketing and stricter filters.
-#     """
-#     query = text("""
-#     WITH FilteredFinancials AS (
-#        SELECT F.CIK AS cik,
-#               C.CompanyName AS company_name,
-#               (F.long_term_debt / NULLIF(F.assets, 0)) AS debt_to_asset_ratio,
-#               NTILE(10) OVER (ORDER BY (F.long_term_debt / NULLIF(F.assets, 0))) AS bucket
-#        FROM Financials F
-#        JOIN companies C ON CAST(F.CIK AS VARCHAR) = CAST(C.CIK AS VARCHAR)
-#        WHERE F.assets > 0 
-#          AND F.long_term_debt IS NOT NULL
-#          AND MOD(CAST(F.CIK AS INTEGER), 3) = 0
-#     ),
-#     PairwiseComparison AS (
-#        SELECT FF1.cik AS company1_cik, 
-#               FF1.company_name AS company1_name,
-#               FF2.cik AS company2_cik, 
-#               FF2.company_name AS company2_name,
-#               ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) AS ratio_difference,
-#               (FF1.debt_to_asset_ratio + FF2.debt_to_asset_ratio) / 2 AS avg_debt_to_asset_ratio
-#        FROM FilteredFinancials FF1
-#        JOIN FilteredFinancials FF2 
-#          ON FF1.bucket = FF2.bucket AND FF1.cik < FF2.cik
-#        WHERE ABS(FF1.debt_to_asset_ratio - FF2.debt_to_asset_ratio) < 0.05
-#     ),
-#     RankedPairs AS (
-#        SELECT company1_cik, company1_name, 
-#               company2_cik, company2_name, 
-#               ratio_difference,
-#               ROW_NUMBER() OVER (PARTITION BY company1_cik ORDER BY ratio_difference ASC) AS pair_rank
-#        FROM PairwiseComparison
-#     )
-#     SELECT company1_cik, company1_name, 
-#            company2_cik, company2_name, 
-#            ratio_difference
-#     FROM RankedPairs
-#     WHERE pair_rank <= 10
-#     ORDER BY ratio_difference ASC
-#     LIMIT 300;
-#     """)
-#     try:
-#         import time
-#         start_time = time.time()
-#         result = await db.execute(query)
-#         results = result.all()
-#         end_time = time.time()
-#         print(f"Time taken: {end_time - start_time} seconds")
-#         if not results:
-#             raise HTTPException(status_code=404, detail="No data found")
-#         return [
-#             {
-#                 "Company1CIK": row.company1_cik,
-#                 "Company1Name": row.company1_name,
-#                 "Company2CIK": row.company2_cik,
-#                 "Company2Name": row.company2_name,
-#                 "RatioDifference": row.ratio_difference,
-#             }
-#             for row in results
-#         ]
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error fetching data: {str(e)}")
-
 
 @general_router.get("/companies/similar_inventory_ratios", response_model=List[Dict])
 async def get_similar_inventory_ratios_balanced(db: AsyncSession = Depends(get_db)):
@@ -665,8 +505,12 @@ async def get_companies_with_financial_improvement(db: AsyncSession = Depends(ge
     ORDER BY year, cik;
     """)
     try:
+        import time
+        start_time = time.time()
         result = await db.execute(query)
         results = result.all()
+        end_time = time.time()
+        print(f"Time taken: {end_time - start_time} seconds")
         if not results:
             raise HTTPException(status_code=404, detail="No data found")
         return [

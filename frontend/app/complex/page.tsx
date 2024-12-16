@@ -21,9 +21,7 @@ export interface QueryResult {
   content: string
 }
 
-// NOTE: some of these are not right or simple
 const queryOptions: QueryOption[] = [
-  // { id: '1', title: 'Get Pairs of Companies with Similar Debt Ratios', description: 'This query identifies pairs of companies with similar debt-to-asset ratios, filtered for meaningful financial comparisons. It first calculates debt-to-asset ratios, then reduces the dataset by selecting every third company to optimize performance. Finally, it compares these ratios, focusing on pairs with a small difference and a significant average ratio, ranking the top 10 closest pairs.' },
   { id: '1', title: 'Get Companies with Significant Financial Improvement', description: "This query identifies companies with significant financial improvement over two years, specifically those that have increased cash reserves by more than 5% and reduced long-term debt by more than 5%."},
   { id: '2', title: 'Get Companies with Best Debt to Asset Ratio', description: "This query calculates the debt-to-asset ratio for each company and joins it with stock price data to analyze average volatility."},
   { id: '3', title: 'Get Advanced Trading Metrics of Companies', description: 'This query returns advanced trading metrics of companies, including volatility, average daily range, upper half closes, VWAP, month price change, and quick ratio.'},
@@ -57,7 +55,6 @@ export function CarouselQueryDisplay() {
     }
 
     const queryUrlMap = {
-      // '1': "/companies/similar_debt_ratios",
       '1': "/companies/financial_improvement",
       '2': "/companies/debt_to_asset_ratio",
       '3': "/stock/advanced-trading-metrics",
